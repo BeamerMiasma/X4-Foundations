@@ -1,4 +1,4 @@
-# X4SaveGameAnalysis v1.0
+# X4SaveGameAnalysis v1.0.1
 # Created by Beamer Miasma 2019-now
 
 # I'll claim no copyrights myself but if you try to make money off of this you'll probably get Egosoft on your
@@ -272,8 +272,10 @@ if (!identical(find("df.temp2"), character(0))) {
 
 # find all NPCs employed by the player
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Parsing player employed NPCs -> df.npcs"))
-df.npcs <- as.data.frame(t(xpathSApply(result, "/savegame/universe//component[@class='npc' and @owner='player']", xmlAttrs, addFinalizer = TRUE)))[,c("id","name","code")]
-if (NCOL(df.npcs) > 0) {
+df.temp <- data.frame()
+df.npcs <- try({df.temp <- as.data.frame(t(xpathSApply(result, "/savegame/universe//component[@class='npc' and @owner='player']", xmlAttrs, addFinalizer = TRUE)))
+                df.temp[,c("id","name",intersect(colnames(df.temp),c("code")))] })
+if (is.data.frame(df.npcs)) {
   df.temp <- df.npcs[, c("id"), drop = FALSE]
   df.temp$numSkills <- xpathSApply(result, "/savegame/universe//component[@class='npc' and @owner='player']/traits", xmlSize, addFinalizer = TRUE)
   df.temp2 <- as.data.frame(t(xpathSApply(result, "/savegame/universe//component[@class='npc' and @owner='player']/traits/skill[@value]", xmlAttrs, addFinalizer = TRUE)))
@@ -493,14 +495,16 @@ df.temp <- ldply(xpathSApply(result, "/savegame/universe//component[contains(@cl
                                                               c("id", xpathSApply(ship, "control/post", xmlGetAttr, "id")))) }
                             ), "rbind")
 df.ships <- left_join(df.ships, df.temp, by = "id")
-df.ships <- left_join(df.ships, setNames(df.npcs[,c("id","name","piloting")], c("id","pilot.name","pilot.skill")), by = c("aipilot" = "id"))
 
-# add employment info to NPCs
-df.npcs[df.npcs$id %in% df.ships$aipilot, "role"] <- "pilot (ship)"
-df.npcs[df.npcs$id %in% df.ships$engineer, "role"] <- "engineer (ship)"
-df.npcs[df.npcs$id %in% df.stations$manager.id, "role"] <- "manager (station)"
-df.npcs[df.npcs$id %in% df.stations$engineer.id, "role"] <- "engineer (station)"
-df.npcs[df.npcs$id %in% df.stations$shiptrader.id, "role"] <- "shiptrader (station)"
+if (!identical(find("df.npcs"), character(0))) {
+  df.ships <- left_join(df.ships, setNames(df.npcs[,c("id","name","piloting")], c("id","pilot.name","pilot.skill")), by = c("aipilot" = "id"))
+  # add employment info to NPCs
+  df.npcs[df.npcs$id %in% df.ships$aipilot, "role"] <- "pilot (ship)"
+  df.npcs[df.npcs$id %in% df.ships$engineer, "role"] <- "engineer (ship)"
+  df.npcs[df.npcs$id %in% df.stations$manager.id, "role"] <- "manager (station)"
+  df.npcs[df.npcs$id %in% df.stations$engineer.id, "role"] <- "engineer (station)"
+  df.npcs[df.npcs$id %in% df.stations$shiptrader.id, "role"] <- "shiptrader (station)"
+}
 
 # more sales table housekeeping
 if (!identical(find("df.sales"), character(0))) {
@@ -549,16 +553,15 @@ if (NROW(df.temp) > 0) {
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Preparing station manager account transfers -> df.transfers"))
 df.transfers <- NULL
 df.temp <- df.log[which(df.log$category == "upkeep" & str_detect(df.log$title, "Received surplus of")),]
-if (NROW(df.temp) > 0) {
+if ((NROW(df.temp) > 0) && (!identical(find("df.npcs"), character(0)))) {
   df.temp[, c("money","manager.name")] <- str_split(df.temp$title, "( of )|( Credits from )", 3, TRUE)[,2:3]
   df.temp$manager.name <- substr(df.temp$manager.name, 1, nchar(df.temp$manager.name)-1)
   df.temp$money <- as.numeric(str_replace_all(df.temp$money, fixed(","), ""))
   df.temp <- left_join(left_join(df.temp[,c("time","money","manager.name")],
                                  df.npcs[df.npcs$role == "manager (station)" ,c("name","id")],
-                                 by = c("manager.name" = "name")
-  ),
-  df.stations[,c("manager.id","code","name")],
-  by = c("id" = "manager.id"))[,c(1,2,4,5,6)]
+                                 by = c("manager.name" = "name") ),
+                       df.stations[,c("manager.id","code","name")],
+                       by = c("id" = "manager.id"))[,c(1,2,4,5,6)]
   colnames(df.temp)[3:5] <- c("station.id","station.code","station.name")
   df.transfers <- df.temp
 }
@@ -1351,3 +1354,8 @@ gc()
 # free() and/or rm() followed by gc() doesn't seem to clear memory the R session grabs when using XML parser
 # restarting the R session seems to be the only way to free up that memory:
 .rs.restartR()
+
+# df.pirates <- df.log[df.log$time >= time.now - 3600 * 10 & str_detect(df.log$title, fixed("Pirate Harassment")), c("time","text")]
+# df.pirates <- df.log[df.log$time >= max(df.log$time) - 3600 * 24 & str_detect(df.log$title, fixed("Pirate Harassment")), c("time","text")]
+# df.pirates <- cbind(df.pirates[,"time",drop=FALSE], setNames(as.data.frame(str_split(df.pirates$text, " in |[.]?.{1}\\\\012.{1}", simplify = TRUE))[,c(1,2,4,5)], c("ship","sector","pirate","response")))
+# aggregate(df.pirates$time, by = list(sector.name = df.pirates$sector), FUN = "length")
