@@ -55,3 +55,4 @@ About R Script: Similar to python in usage and architecture but more aimed at st
 
 HISTORY:
 v1.0 - Initial release for game version 5.10
+v1.0.1 - Small change to make parsing the player employed NPCs a bit more forgiving in case data is missing or malformed due to mod interference (or anything really). If parsing the NPCs fails you still get the error message in the output, but the script should continue and all the graphs should be OK. In this case you won't have the df.npcs dataset available and the df.ships dataset will not contain the pilot name and skill.
