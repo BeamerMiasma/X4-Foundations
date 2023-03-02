@@ -213,3 +213,4 @@
 "ship_par_xl_carrier_02_a_macro"	"Zeus E"	"xl"	"paranid"	17540630	0	19	2	303000	771.902	22000	3	153.812	878.927	854.38	854.38	854.38	143	12	24	0	"military"
 "ship_par_xl_carrier_01_b_macro"	"Zeus Sentinel"	"xl"	"par"	15747905	0	19	2	337000	857.54	24000	3	235.789	943.155	871.508	871.508	871.508	132	12	50	0	""
 "ship_par_xl_carrier_01_a_macro"	"Zeus Vanguard"	"xl"	"par"	13127715	0	19	2	281000	714.616	20000	3	208.991	835.962	842.923	842.923	842.923	159	12	50	0	""
+"ship_spl_s_trans_container_01_a_macro"	"Tuatara"	"s"	"split"	0	2	0	1	2300	17.2	1350	3	5.1	21.8	6.3	6.3	6.3	4	0	0	1	"trader"

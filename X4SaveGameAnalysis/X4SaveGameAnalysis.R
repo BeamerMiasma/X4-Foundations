@@ -1,4 +1,4 @@
-# X4SaveGameAnalysis v1.0.1
+# X4SaveGameAnalysis v1.0.2
 # Created by Beamer Miasma 2019-now
 
 # I'll claim no copyrights myself but if you try to make money off of this you'll probably get Egosoft on your
@@ -87,7 +87,7 @@ graphs.dpi <- 96          # only meaningful for raster image types
 # htmltools   (utilities for html output)
 
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Loading (and installing if necessary) required packages"))
-requiredPackages <- c("XML", "stringr", "plyr", "dplyr", "reshape2", "DT", "ggplot2", "scales", "htmlwidgets", "htmltools", "dichromat", "plotly", "ggpubr")
+requiredPackages <- c("XML", "stringr", "plyr", "dplyr", "reshape2", "DT", "ggplot2", "scales", "htmlwidgets", "htmltools", "dichromat", "plotly", "ggpubr","svglite")
 for (p in requiredPackages) {
   if (!require(p, character.only = TRUE)) { install.packages(p) }
   library(p, character.only = TRUE)
@@ -148,6 +148,10 @@ for (c in c(5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21)) {
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Reading cluster & sector info from csv"))
 df.clusterdata <- read.csv(file = paste0(path.CSVs, "/X4_clusters.csv"))
 df.sectordata <- read.csv(file = paste0(path.CSVs, "/X4_sectors.csv"))
+
+# Reading special names from csv (Soon (tm))
+# message(paste(format(Sys.time(), "%H:%M:%OS3"), "Reading special names from csv"))
+# df.namedata <- read.table(file = paste0(path.CSVs, "/X4_special_names.csv"), sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
 
 # palette for non-faction graphs (sorry, I'm colourblind, this probably looks horrible)
 plot.palette <- c(dichromat_pal("BrowntoBlue.10")(10)[c(1,2,3,4,5,6,8,10)],
@@ -506,6 +510,12 @@ if (!identical(find("df.npcs"), character(0))) {
   df.npcs[df.npcs$id %in% df.stations$shiptrader.id, "role"] <- "shiptrader (station)"
 }
 
+# adding ship names to df.playerowned too, need them later
+idx <- which(df.playerowned$class != "station" & is.na(df.playerowned$name))
+df.playerowned$name[idx] <- df.shipdata$model[match(df.playerowned$macro[idx], df.shipdata$macro)]
+idx <- which(df.playerowned$class != "station" & is.na(df.playerowned$name))
+df.playerowned$name[idx] <- as.character(df.playerowned$macro[idx])
+
 # more sales table housekeeping
 if (!identical(find("df.sales"), character(0))) {
   message(paste(format(Sys.time(), "%H:%M:%OS3"), "Fixing names of renamed sellers -> df.sales"))
@@ -728,7 +738,7 @@ dashboard.html <- paste0(dashboard.html, "</p>")
 # generating the bar and stacked area plots
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Generating bar and area plots"))
 sample_smoothing <- 1
-avg_smoothing <- 12
+avg_smoothing <- 6
 
 if (!identical(find("df.sales"), character(0))) {
   maxtime <- max(df.sales$time)
@@ -1354,8 +1364,3 @@ gc()
 # free() and/or rm() followed by gc() doesn't seem to clear memory the R session grabs when using XML parser
 # restarting the R session seems to be the only way to free up that memory:
 .rs.restartR()
-
-# df.pirates <- df.log[df.log$time >= time.now - 3600 * 10 & str_detect(df.log$title, fixed("Pirate Harassment")), c("time","text")]
-# df.pirates <- df.log[df.log$time >= max(df.log$time) - 3600 * 24 & str_detect(df.log$title, fixed("Pirate Harassment")), c("time","text")]
-# df.pirates <- cbind(df.pirates[,"time",drop=FALSE], setNames(as.data.frame(str_split(df.pirates$text, " in |[.]?.{1}\\\\012.{1}", simplify = TRUE))[,c(1,2,4,5)], c("ship","sector","pirate","response")))
-# aggregate(df.pirates$time, by = list(sector.name = df.pirates$sector), FUN = "length")
