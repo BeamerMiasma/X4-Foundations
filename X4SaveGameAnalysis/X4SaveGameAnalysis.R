@@ -1,4 +1,4 @@
-# X4SaveGameAnalysis v1.0.2
+# X4SaveGameAnalysis v1.1.0
 # Created by Beamer Miasma 2019-now
 
 # I'll claim no copyrights myself but if you try to make money off of this you'll probably get Egosoft on your
@@ -47,6 +47,9 @@ savegame.override <- ""
 # refresh, and then set it back to FALSE again.
 cache.forceRefresh <- FALSE
 
+# compress the cache files to gzip to save some disk space
+cache.compress <- TRUE
+
 # image type used. I recommend "svg" for best results but you can change this to "png" or "jpg" if you prefer
 graphs.imagetype <- "svg"
 
@@ -85,9 +88,12 @@ graphs.dpi <- 96          # only meaningful for raster image types
 # dichromat   (graph colours)
 # htmlwidgets (utilities for html output)
 # htmltools   (utilities for html output)
+# svglite     (svg image output)
+# utils       (general R utilities)
 
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Loading (and installing if necessary) required packages"))
-requiredPackages <- c("XML", "stringr", "plyr", "dplyr", "reshape2", "DT", "ggplot2", "scales", "htmlwidgets", "htmltools", "dichromat", "plotly", "ggpubr","svglite")
+requiredPackages <- c("XML", "stringr", "plyr", "dplyr", "reshape2", "DT", "ggplot2", "scales", "htmlwidgets", "htmltools", "dichromat",
+                      "plotly", "ggpubr","svglite","utils")
 for (p in requiredPackages) {
   if (!require(p, character.only = TRUE)) { install.packages(p) }
   library(p, character.only = TRUE)
@@ -125,6 +131,103 @@ sector.owners <-    c("player", "argon", "antigone", "teladi", "ministry", "holy
                       "fallensplit", "xenon", "khaak", "pioneers", "buccaneers", "scavenger",
                       "terran", "loanshark", "yaki", "ownerless")
 
+wares.levels <- c("advancedcomposites",
+                  "advancedelectronics",
+                  "antimattercells",
+                  "antimatterconverters",
+                  "cheltmeat",
+                  "claytronics",
+                  "computronicsubstrate",
+                  "dronecomponents",
+                  "energycells",
+                  "engineparts",
+                  "fieldcoils",
+                  "foodrations",
+                  "graphene",
+                  "helium",
+                  "hullparts",
+                  "hydrogen",
+                  "ice",
+                  "majasnails",
+                  "meat",
+                  "medicalsupplies",
+                  "metallicmicrolattice",
+                  "methane",
+                  "microchips",
+                  "missilecomponents",
+                  "nividium",
+                  "nostropoil",
+                  "ore",
+                  "plasmaconductors",
+                  "quantumtubes",
+                  "rawscrap",
+                  "refinedmetals",
+                  "scanningarrays",
+                  "scruffinfruits",
+                  "shieldcomponents",
+                  "silicon",
+                  "siliconcarbide",
+                  "siliconwafers",
+                  "smartchips",
+                  "sojabeans",
+                  "sojahusk",
+                  "spices",
+                  "sunriseflowers",
+                  "superfluidcoolant",
+                  "teladianium",
+                  "turretcomponents",
+                  "water",
+                  "weaponcomponents",
+                  "wheat")
+wares.names <- c("Advanced Composites",
+                 "Advanced Electronics",
+                 "Antimatter Cells",
+                 "Antimatter Converters",
+                 "Chelt Meat",
+                 "Claytronics",
+                 "Computronic Substrate",
+                 "Drone Components",
+                 "Energy Cells",
+                 "Engine Parts",
+                 "Field Coils",
+                 "Food Rations",
+                 "Graphene",
+                 "Helium",
+                 "Hull Parts",
+                 "Hydrogen",
+                 "Ice",
+                 "Maja Snails",
+                 "Meat",
+                 "Medical Supplies",
+                 "Metallic Microlattice",
+                 "Methane",
+                 "Microchips",
+                 "Missile Components",
+                 "Nividium",
+                 "Nostrop Oil",
+                 "Ore",
+                 "Plasma Conductors",
+                 "Quantum Tubes",
+                 "Raw Scrap",
+                 "Refined Metals",
+                 "Scanning Arrays",
+                 "Scruffin Fruit",
+                 "Shield Components",
+                 "Silicon",
+                 "Silicon Carbide",
+                 "Silicon Wafers",
+                 "Smart Chips",
+                 "Soja Beans",
+                 "Soja Husk",
+                 "Spices",
+                 "Sunrise Flowers",
+                 "Superfluid Coolant",
+                 "Teladianium",
+                 "Turret Components",
+                 "Water",
+                 "Weapon Components",
+                 "Wheat")
+
 # factor for ship sizes
 shipsize.levels <- c("XS", "S", "M", "L", "XL", "XXL")
 
@@ -149,9 +252,9 @@ message(paste(format(Sys.time(), "%H:%M:%OS3"), "Reading cluster & sector info f
 df.clusterdata <- read.csv(file = paste0(path.CSVs, "/X4_clusters.csv"))
 df.sectordata <- read.csv(file = paste0(path.CSVs, "/X4_sectors.csv"))
 
-# Reading special names from csv (Soon (tm))
-# message(paste(format(Sys.time(), "%H:%M:%OS3"), "Reading special names from csv"))
-# df.namedata <- read.table(file = paste0(path.CSVs, "/X4_special_names.csv"), sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
+# Reading special names from csv
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Reading special names from csv"))
+df.namedata <- read.table(file = paste0(path.CSVs, "/X4_special_names.csv"), sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
 
 # palette for non-faction graphs (sorry, I'm colourblind, this probably looks horrible)
 plot.palette <- c(dichromat_pal("BrowntoBlue.10")(10)[c(1,2,3,4,5,6,8,10)],
@@ -193,6 +296,60 @@ message(paste(format(Sys.time(), "%H:%M:%OS3"), "Found Game GUID:", game.guid))
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Found player name:", game.playername))
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Found player faction name:", factions.names[1]))
 
+cache.resources <- paste0(path.CSVs, "/cache_resources_", game.guid, ".csv")
+cache.resources.gz <- paste0(cache.resources, ".gz")
+cache.log <- paste0(path.CSVs, "/cache_log_", game.guid, ".csv")
+cache.log.gz <- paste0(cache.log, ".gz")
+cache.tradelog <- paste0(path.CSVs, "/cache_tradelog_", game.guid, ".csv")
+cache.tradelog.gz <- paste0(cache.tradelog, ".gz")
+
+# checking if cache compression changed
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Checking cache compression changes"))
+if (cache.compress && file.exists(cache.resources)) {
+  message(paste(format(Sys.time(), "%H:%M:%OS3"), "Compressing resource cache"))
+  df.cache <- read.table(file = cache.resources, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
+  cache.file <- gzfile(cache.resources.gz)
+  write.table(df.cache, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+  file.remove(cache.resources)
+} else if (!cache.compress && file.exists(cache.resources.gz)) {
+  message(paste(format(Sys.time(), "%H:%M:%OS3"), "Decompressing resource cache"))
+  df.cache <- read.table(file = cache.resources.gz, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
+  cache.file <- file(cache.resources)
+  write.table(df.cache, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+  file.remove(cache.resources.gz)
+}
+if (cache.compress && file.exists(cache.log)) {
+  message(paste(format(Sys.time(), "%H:%M:%OS3"), "Compressing log cache"))
+  df.cache <- read.table(file = cache.log, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
+  cache.file <- gzfile(cache.log.gz)
+  write.table(df.cache, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+  file.remove(cache.log)
+} else if (!cache.compress && file.exists(cache.log.gz)) {
+  message(paste(format(Sys.time(), "%H:%M:%OS3"), "Decompressing log cache"))
+  df.cache <- read.table(file = cache.log.gz, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
+  cache.file <- file(cache.log)
+  write.table(df.cache, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+  file.remove(cache.log.gz)
+}
+if (cache.compress && file.exists(cache.tradelog)) {
+  message(paste(format(Sys.time(), "%H:%M:%OS3"), "Compressing tradelog cache"))
+  df.cache <- read.table(file = cache.tradelog, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
+  cache.file <- gzfile(cache.tradelog.gz)
+  write.table(df.cache, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+  file.remove(cache.tradelog)
+} else if (!cache.compress && file.exists(cache.tradelog.gz)) {
+  message(paste(format(Sys.time(), "%H:%M:%OS3"), "Decompressing tradelog cache"))
+  df.cache <- read.table(file = cache.tradelog.gz, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
+  cache.file <- file(cache.tradelog)
+  write.table(df.cache, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+  file.remove(cache.tradelog.gz)
+}
+if (cache.compress) {
+  cache.resources <- cache.resources.gz
+  cache.log <- cache.log.gz
+  cache.tradelog <- cache.tradelog.gz
+}
+
 # find clusters, sectors, stations and ships
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Parsing Universe"))
 df.universe <- ldply(xpathSApply(result, "/savegame/universe//component[@class='station' or contains(@class,'ship') or @class='sector' or @class='cluster']", xmlAttrs), "rbind", .id = NULL)
@@ -219,7 +376,6 @@ df.sectors <- left_join(df.sectors[,c("id","macro","code","owner","knownto","con
 df.sectors$name[is.na(df.sectors$name)] <- df.sectors$sector.macro[is.na(df.sectors$name)]
 
 # read resource cache or generate it if it doesn't exist yet
-cache.resources <- paste0(path.CSVs, "/cache_resources_", game.guid, ".csv")
 if ((!file.exists(cache.resources)) || (cache.forceRefresh)) {
   message(paste(format(Sys.time(), "%H:%M:%OS3"), "Preparing sector resource info"))
   message(paste(format(Sys.time(), "%H:%M:%OS3"), "NOTE: This may take several minutes but will only need to run once after you start a new game or after installing DLC"))
@@ -245,7 +401,13 @@ if ((!file.exists(cache.resources)) || (cache.forceRefresh)) {
   rm(df.resourceareas)
   
   message(paste(format(Sys.time(), "%H:%M:%OS3"), "Saving resource info to cache file:", cache.resources))
-  write.table(df.temp2, file = cache.resources, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+  if (cache.compress) {
+    cache.file <- gzfile(cache.resources)
+  } else {
+    cache.file <- file(cache.resources)
+  }
+  write.table(df.temp2, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+  close(cache.file)
 } else {
   message(paste(format(Sys.time(), "%H:%M:%OS3"), "Preparing sector resource info -> found resource cache file, reading", cache.resources))
   df.temp2 <- read.table(file = cache.resources, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
@@ -294,7 +456,7 @@ if (is.data.frame(df.npcs)) {
 
 # gather the log
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Parsing log entries -> df.log"))
-df.log <- ldply(xpathSApply(result, "/savegame/log/entry", xmlAttrs, addFinalizer = TRUE), "rbind", .id = NULL)
+df.log <- ldply(xpathSApply(result, "/savegame/log/entry[boolean(@category)=false or (@category='upkeep' and @title!='Trade Completed')]", xmlAttrs, addFinalizer = TRUE), "rbind", .id = NULL)
 df.log$time <- as.numeric(as.character(df.log$time))
 df.log$money <- as.numeric(as.character(df.log$money))
 df.log$category[is.na(df.log$category)] <- ""
@@ -302,9 +464,9 @@ df.log <- unique(df.log[,c("time","category","title","text","money","component")
 
 # read old log entries from cache and update the cache with the new entries
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Loading and merging log cache"))
-cache.log <- paste0(path.CSVs, "/cache_log_", game.guid, ".csv")
 if (file.exists(cache.log)) {
   df.cache <- read.table(file = cache.log, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
+  df.cache <- df.cache[which(df.cache$category == "" | (df.cache$category == "upkeep" & df.cache$title != "Trade Completed")),]
   df.cache$time <- as.numeric(df.cache$time)
   df.cache$money <- as.numeric(df.cache$money)
   df.cache$category[is.na(df.cache$category)] <- ""
@@ -312,133 +474,12 @@ if (file.exists(cache.log)) {
   for (idx in row(mintime.categories[1])) { df.cache <- df.cache[-which(df.cache$category == mintime.categories$category[idx] & df.cache$time >= mintime.categories$time[idx]),] }
   df.log <- unique(rbind(df.cache, df.log))
 }
-write.table(df.log, file = cache.log, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
-
-# find sales
-message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding commodity trades -> df.sales"))
-df.temp <- df.log[which(df.log$title == "Trade Completed" & str_detect(df.log$text, ".* sold .* to .* in .* for .*")),]
-if (NROW(df.temp) > 0) {
-  df.temp[,c("seller","parse2")] <- str_split(df.temp$text, fixed(" sold "), 2, TRUE)
-  df.temp$seller.name <- str_split(df.temp$seller, " [A-Z]{3}-[0-9]{3}", 2, TRUE)[,1]
-  df.temp$seller.code <- str_extract(df.temp$seller, "[A-Z]{3}-[0-9]{3}")
-  df.temp[,c("wares","parse3")] <- str_split(df.temp$parse2, fixed(" to "), 2, TRUE)
-  df.temp[,c("amount","commodity")] <- str_split(df.temp$wares, fixed(" "), 2, TRUE)
-  df.temp[,c("buyer.faction","parse4a")] <- str_split(df.temp$parse3, fixed(" "), 2, TRUE)
-  df.temp[,c("buyer.object","parse4")] <- str_split(df.temp$parse4a, fixed(" in "), 2, TRUE)
-  df.temp$buyer.object[df.temp$buyer.faction == "Build"] <- paste("Build", df.temp$buyer.object[df.temp$buyer.faction == "Build"])
-  df.temp$buyer.faction[df.temp$buyer.faction == "Build"] <- NA
-  df.temp$buyer.code <- str_extract(df.temp$buyer.object, "[A-Z]{3}-[0-9]{3}")
-  df.temp$buyer.object <- str_split(df.temp$buyer.object, " [(]*[A-Z]{3}-[0-9]{3}[)]*", 2, TRUE)[,1]
-  df.temp[,c("location","parse5")] <- str_split(df.temp$parse4, fixed(" for "), 2, TRUE)
-  df.temp$money <- floor(df.temp$money / 100.0)
-  df.sales <- df.temp[,c("time","money","seller.name","seller.code","amount","commodity","buyer.faction","buyer.object","buyer.code","location")]
-}
-
-# find buys, this requires a specific mod that adds info about buys to the log
-# if the mod is not installed buys cannot be tracked (yet)
-# maybe one day I'll feel like reverse engineering the economylog but... not today
-# https://www.nexusmods.com/x4foundations/mods/26
-# not sure if it still works in the current version, I've mostly been playing my unmodded game
-message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding commodity buys -> df.buys (note: requires mod)"))
-df.temp <- df.log[which(df.log$title == "Trade Completed" & str_detect(df.log$text, ".* bought .* from .* in .* for .*")),]
-if (NROW(df.temp) > 0) {
-  df.temp[,c("buyer","parse2")] <- str_split(df.temp$text, fixed(" bought "), 2, TRUE)
-  df.temp$buyer.name <- str_split(df.temp$buyer, " [A-Z]{3}-[0-9]{3}", 2, TRUE)[,1]
-  df.temp$buyer.code <- str_extract(df.temp$buyer, "[A-Z]{3}-[0-9]{3}")
-  df.temp[,c("wares","parse3")] <- str_split(df.temp$parse2, fixed(" from "), 2, TRUE)
-  df.temp[,c("amount","commodity")] <- str_split(df.temp$wares, fixed(" "), 2, TRUE)
-  df.temp[,c("seller.faction","parse4a")] <- str_split(df.temp$parse3, fixed(" "), 2, TRUE)
-  df.temp[,c("seller.object","parse4")] <- str_split(df.temp$parse4a, fixed(" in "), 2, TRUE)
-  df.temp$seller.code <- str_extract(df.temp$seller.object, "[A-Z]{3}-[0-9]{3}")
-  df.temp$seller.object <- str_split(df.temp$seller.object, " [(]*[A-Z]{3}-[0-9]{3}[)]*", 2, TRUE)[,1]
-  df.temp[,c("location","parse5")] <- str_split(df.temp$parse4, fixed(" for "), 2, TRUE)
-  df.temp$money <- floor(df.temp$money / 100.0)
-  df.temp$category <- NULL
-  df.temp$title <- NULL
-  df.temp$text <- NULL
-  df.temp$component <- NULL
-  df.temp$buyer <- NULL
-  df.temp$parse2 <- NULL
-  df.temp$wares <- NULL
-  df.temp$parse3 <- NULL
-  df.temp$parse4a <- NULL
-  df.temp$parse4 <- NULL
-  df.temp$parse5 <- NULL
-  df.buys <- df.temp
+if (cache.compress) {
+  cache.file <- gzfile(cache.log)
 } else {
-  if (any(ls() == "df.buys")) { rm(df.buys) }
+  cache.file <- file(cache.log)
 }
-
-# find ship constructions
-message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding ship constructions -> df.sales"))
-df.temp <- df.log[which(df.log$category == "upkeep" & df.log$title == "Ship constructed"),]
-if (NROW(df.temp) > 0) {
-  df.temp[,c("wares","parse2")] <- str_split(df.temp$text, fixed(" finished construction at station: "), 2, TRUE)
-  df.temp[,c("seller","parse3")] <- str_split(df.temp$parse2, fixed(". They have paid"), 2, TRUE)
-  df.temp$seller.name <- str_split(df.temp$seller, " [(][A-Z]{3}-[0-9]{3}[)]", 2, TRUE)[,1]
-  df.temp$seller.code <- str_extract(df.temp$seller, "[A-Z]{3}-[0-9]{3}")
-  df.temp$amount <- 1
-  df.temp$commodity <- "Ship construction"
-  df.temp[,c("buyer.faction","buyer.object")] <- str_split(df.temp$wares, fixed(" "), 2, TRUE)
-  df.temp$buyer.code <- str_extract(df.temp$buyer.object, "[A-Z]{3}-[0-9]{3}")
-  df.temp$buyer.object <- str_split(df.temp$buyer.object, " [(]*[A-Z]{3}-[0-9]{3}[)]*", 2, TRUE)[,1]
-  df.temp$location <- NA
-  df.temp$money <- floor(df.temp$money / 100.0)
-  df.sales <- rbind(df.sales, df.temp[,colnames(df.sales)])
-}
-
-# find ship repairs
-message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding ship repairs -> df.sales"))
-df.temp <- df.log[which(df.log$category == "upkeep" & df.log$title == "Ship repaired"),]
-if (NROW(df.temp) > 0) {
-  df.temp[,c("wares","parse2")] <- str_split(df.temp$text, fixed(" finished repairing at station: "), 2, TRUE)
-  df.temp[,c("seller","parse3")] <- str_split(df.temp$parse2, fixed(". They have paid"), 2, TRUE)
-  df.temp$seller.name <- str_split(df.temp$seller, " [(][A-Z]{3}-[0-9]{3}[)]", 2, TRUE)[,1]
-  df.temp$seller.code <- str_extract(df.temp$seller, "[A-Z]{3}-[0-9]{3}")
-  df.temp$amount <- 1
-  df.temp$commodity <- "Ship repair"
-  df.temp[,c("buyer.faction","buyer.object")] <- str_split(df.temp$wares, fixed(" "), 2, TRUE)
-  df.temp$buyer.code <- str_extract(df.temp$buyer.object, "[A-Z]{3}-[0-9]{3}")
-  df.temp$buyer.object <- str_split(df.temp$buyer.object, " [(]*[A-Z]{3}-[0-9]{3}[)]*", 2, TRUE)[,1]
-  df.temp$money <- floor(df.temp$money / 100.0)
-  df.temp$location <- NA
-  df.sales <- rbind(df.sales, df.temp[,colnames(df.sales)])
-}
-
-# find ship resupplies
-message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding ship resupplies -> df.sales"))
-df.temp <- df.log[which(df.log$category == "upkeep" & df.log$title == "Ship resupplied"),]
-if (NROW(df.temp) > 0) {
-  df.temp[,c("wares","parse2")] <- str_split(df.temp$title, fixed(" finished resupplying at station: "), 2, TRUE)
-  df.temp[,c("seller","parse3")] <- str_split(df.temp$parse2, fixed(". They have paid"), 2, TRUE)
-  df.temp$seller.name <- str_split(df.temp$seller, " [(][A-Z]{3}-[0-9]{3}[)]", 2, TRUE)[,1]
-  df.temp$seller.code <- str_extract(df.temp$seller, "[A-Z]{3}-[0-9]{3}")
-  df.temp$amount <- 1
-  df.temp$commodity <- "Ship resupply"
-  df.temp[,c("buyer.faction","buyer.object")] <- str_split(df.temp$wares, fixed(" "), 2, TRUE)
-  df.temp$buyer.code <- str_extract(df.temp$buyer.object, "[A-Z]{3}-[0-9]{3}")
-  df.temp$buyer.object <- str_split(df.temp$buyer.object, " [(]*[A-Z]{3}-[0-9]{3}[)]*", 2, TRUE)[,1]
-  df.temp$location <- NA
-  df.temp$money <- floor(df.temp$money / 100.0)
-  df.sales <- rbind(df.sales, df.temp[,colnames(df.sales)])
-}
-
-# some housekeeping on the sales table
-if (!identical(find("df.sales"), character(0))) {
-  df.sales <- df.sales[order(df.sales$time, decreasing = TRUE),]
-  # adding names for ships/stations that still have default name
-  df.temp <- df.playerowned[!is.na(df.playerowned$name), c("code","name")]
-  df.sales$seller.name[is.na(df.sales$seller.name)] <- df.temp$name[match(df.sales$seller.code[is.na(df.sales$seller.name)], df.temp$code)]
-  df.sales$buyer.faction <- factor(as.character(df.sales$buyer.faction), levels = factions.levels, ordered = TRUE)
-  df.sales$seller.name <- as.factor(df.sales$seller.name)
-  df.sales$seller.code <- as.factor(df.sales$seller.code)
-  df.sales$commodity <- as.factor(df.sales$commodity)
-  df.sales$location <- as.factor(df.sales$location)
-  df.sales$money <- as.integer(df.sales$money)
-  df.sales$amount <- as.integer(df.sales$amount)
-} else {
-  message(paste(format(Sys.time(), "%H:%M:%OS3"), "-> No sales found"))
-}
+write.table(df.log, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
 
 # find various info on stations (station personel, population, nr of modules, estimate mass and hull)
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Preparing player owned stations -> df.stations"))
@@ -516,34 +557,175 @@ df.playerowned$name[idx] <- df.shipdata$model[match(df.playerowned$macro[idx], d
 idx <- which(df.playerowned$class != "station" & is.na(df.playerowned$name))
 df.playerowned$name[idx] <- as.character(df.playerowned$macro[idx])
 
-# more sales table housekeeping
-if (!identical(find("df.sales"), character(0))) {
-  message(paste(format(Sys.time(), "%H:%M:%OS3"), "Fixing names of renamed sellers -> df.sales"))
-  df.sales$seller.station <- as.character(df.stations$name[match(df.sales$seller.code, df.stations$code)])
-  df.sales$seller.ship <- as.character(df.ships$name[match(df.sales$seller.code, df.ships$code)])
-  df.sales$seller.name <- as.character(df.sales$seller.name)
-  df.sales$seller.name[!is.na(df.sales$seller.station)] <- df.sales$seller.station[!is.na(df.sales$seller.station)]
-  df.sales$seller.name[!is.na(df.sales$seller.ship)] <- df.sales$seller.ship[!is.na(df.sales$seller.ship)]
-  df.sales$seller.name <- as.factor(df.sales$seller.name)
-  df.sales$seller.ship <- NULL
-  df.sales$seller.station <- NULL
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Parsing economylog -> df.tradelog"))
+# get trades from economylog
+df.tradelog <- ldply(xpathSApply(result, "/savegame/economylog/entries[@type='trade']/log", xmlAttrs), "rbind")
+# get referenced removed objects
+df.temp <- ldply(xpathSApply(result, "/savegame/economylog/removed/object", xmlAttrs), "rbind")
+# add name/code/owner for removed objects
+df.tradelog[,c("seller.name","seller.code","seller.owner")] <- df.temp[match(df.tradelog$seller, df.temp$id), c("name","code","owner")]
+
+# determine proxy sellers (subordinate traders)
+idx <- which(df.tradelog$seller %in% df.wings$follower)
+df.tradelog[idx, "seller.proxy.id"] <- df.tradelog$seller[idx]
+# set seller to commander of proxy
+df.tradelog$seller[idx]<- df.wings$leader[match(df.tradelog$seller[idx], df.wings$follower)]
+# add name/code/owner for player owned seller objects
+idx <- which(is.na(df.tradelog$seller.name) & df.tradelog$seller %in% df.playerowned$id)
+df.tradelog[idx, c("seller.name","seller.code")] <- df.playerowned[match(df.tradelog$seller[idx], df.playerowned$id), c("name","code")]
+df.tradelog$seller.owner[idx] <- "player"
+# add name/code/owner for NPC owned seller objects
+idx <- which(is.na(df.tradelog$seller.name))
+df.tradelog[idx, c("seller.name","seller.code","seller.owner")] <- df.universe[match(df.tradelog$seller[idx], df.universe$id), c("name","code","owner")]
+# construct name from faction code and ship model name
+idx <- which(is.na(df.tradelog$seller.name))
+df.tradelog$seller.name[idx] <- paste(factions.levels[match(df.tradelog$seller.owner[idx], sector.owners)], df.shipdata$model[match(df.universe$macro[match(df.tradelog$seller.code[idx], df.universe$code)], df.shipdata$macro)] )
+# if it wasn't a ship it must have been a station
+idx <- intersect(idx, which(str_detect(df.tradelog$seller.name, "^.{3} NA$")))
+df.tradelog$seller.name[idx] <- sub("NA", "Station", df.tradelog$seller.name[idx], fixed = TRUE)
+# adding names of special objects (story stations etc)
+idx <- which(df.tradelog$seller.name %in% df.namedata$id)
+df.tradelog$seller.name[idx] <- df.namedata$name[match(df.tradelog$seller.name[idx], df.namedata$id)]
+# add seller proxy name/code
+idx <- which(df.tradelog$seller.proxy.id %in% df.playerowned$id)
+df.tradelog[idx, c("seller.proxy.name","seller.proxy.code")] <- df.playerowned[match(df.tradelog$seller.proxy.id[idx], df.playerowned$id), c("name","code")]
+
+# same exercise once more for buyer & buyer proxy
+df.tradelog[,c("buyer.name","buyer.code","buyer.owner")] <- df.temp[match(df.tradelog$buyer, df.temp$id), c("name","code","owner")]
+
+idx <- which(df.tradelog$buyer %in% df.wings$follower)
+df.tradelog[idx, "buyer.proxy.id"] <- df.tradelog$buyer[idx]
+df.tradelog$buyer[idx]<- df.wings$leader[match(df.tradelog$buyer[idx], df.wings$follower)]
+
+idx <- which(is.na(df.tradelog$buyer.name) & df.tradelog$buyer %in% df.playerowned$id)
+df.tradelog[idx, c("buyer.name","buyer.code")] <- df.playerowned[match(df.tradelog$buyer[idx], df.playerowned$id), c("name","code")]
+df.tradelog$buyer.owner[idx] <- "player"
+idx <- which(is.na(df.tradelog$buyer.name))
+df.tradelog[idx, c("buyer.name","buyer.code","buyer.owner")] <- df.universe[match(df.tradelog$buyer[idx], df.universe$id), c("name","code","owner")]
+idx <- which(is.na(df.tradelog$buyer.name))
+df.tradelog$buyer.name[idx] <- paste(factions.levels[match(df.tradelog$buyer.owner[idx], sector.owners)], df.shipdata$model[match(df.universe$macro[match(df.tradelog$buyer.code[idx], df.universe$code)], df.shipdata$macro)] )
+idx <- intersect(idx, which(str_detect(df.tradelog$buyer.name, "^.{3} NA$")))
+df.tradelog$buyer.name[idx] <- sub("NA", "Station", df.tradelog$buyer.name[idx], fixed = TRUE)
+idx <- which(df.tradelog$buyer.name %in% df.namedata$id)
+df.tradelog$buyer.name[idx] <- df.namedata$name[match(df.tradelog$buyer.name[idx], df.namedata$id)]
+
+idx <- which(df.tradelog$buyer.proxy.id %in% df.playerowned$id)
+df.tradelog[idx, c("buyer.proxy.name","buyer.proxy.code")] <- df.playerowned[match(df.tradelog$buyer.proxy.id[idx], df.playerowned$id), c("name","code")]
+
+# housekeeping
+df.tradelog$seller.faction <- factor(factions.levels[match(df.tradelog$seller.owner, sector.owners)], levels = factions.levels, ordered = TRUE)
+df.tradelog$buyer.faction <- factor(factions.levels[match(df.tradelog$buyer.owner, sector.owners)], levels = factions.levels, ordered = TRUE)
+df.tradelog$time <- as.numeric(df.tradelog$time)
+df.tradelog$price <- as.numeric(df.tradelog$price) / 100.0
+df.tradelog$v <- as.integer(df.tradelog$v)
+df.tradelog$money <- as.integer(df.tradelog$price * df.tradelog$v)
+df.tradelog$ware <- factor(df.tradelog$ware, levels = wares.levels, ordered = TRUE)
+colnames(df.tradelog)[match(c("ware","buyer","seller","v"), colnames(df.tradelog))] <- c("commodity","buyer.id","seller.id","amount")
+df.tradelog <- df.tradelog[,c("time","commodity","price","amount","money",
+                              "seller.faction","seller.id","seller.name","seller.code","seller.proxy.id","seller.proxy.name","seller.proxy.code",
+                              "buyer.faction","buyer.id","buyer.name","buyer.code","buyer.proxy.id","buyer.proxy.name","buyer.proxy.code")]
+# that wasn't so hard was it? better save this to a cache
+# read old log entries from cache and update the cache with the new entries
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Loading and merging tradelog cache"))
+if (file.exists(cache.tradelog)) {
+  df.cache <- read.table(file = cache.tradelog, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
+  df.cache$time <- as.numeric(df.cache$time)
+  df.cache$price <- as.numeric(df.cache$price)
+  df.cache$amount <- as.integer(df.cache$amount)
+  df.cache$money <- as.integer(df.cache$money)
+  df.cache$seller.faction <- factor(df.cache$seller.faction, levels = factions.levels, ordered = TRUE)
+  df.cache$buyer.faction <- factor(df.cache$buyer.faction, levels = factions.levels, ordered = TRUE)
+  df.cache$commodity <- factor(df.cache$commodity, levels = wares.levels, ordered = TRUE)
+  mintime <- min(df.tradelog$time)
+  df.cache <- df.cache[-which(df.cache$time > mintime),]
+  df.tradelog <- unique(rbind(df.cache, df.tradelog))
+}
+if (cache.compress) {
+  cache.file <- gzfile(cache.tradelog)
 } else {
-  message(paste(format(Sys.time(), "%H:%M:%OS3"), "-> No player sales found"))
+  cache.file <- file(cache.tradelog)
+}
+write.table(df.tradelog, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+#write.table(df.tradelog, file = cache.tradelog, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
+
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Gathering sales -> df.sales"))
+df.sales <- df.tradelog[which(df.tradelog$seller.faction == "PLA" & df.tradelog$buyer.faction != "PLA"), c("time","money","seller.name","seller.code","amount","commodity","buyer.faction","buyer.name","buyer.code")]
+df.sales$commodity <- as.character(df.sales$commodity)
+
+# find ship constructions
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding ship constructions -> df.sales"))
+df.temp <- df.log[which(df.log$category == "upkeep" & df.log$title == "Ship constructed"),]
+if (NROW(df.temp) > 0) {
+  df.temp[,c("wares","parse2")] <- str_split(df.temp$text, fixed(" finished construction at station: "), 2, TRUE)
+  df.temp[,c("seller","parse3")] <- str_split(df.temp$parse2, fixed(". They have paid"), 2, TRUE)
+  df.temp$seller.name <- str_split(df.temp$seller, " [(][A-Z]{3}-[0-9]{3}[)]", 2, TRUE)[,1]
+  df.temp$seller.code <- str_extract(df.temp$seller, "[A-Z]{3}-[0-9]{3}")
+  df.temp$amount <- 1
+  df.temp$commodity <- "Ship construction"
+  df.temp[,c("buyer.faction","buyer.name")] <- str_split(df.temp$wares, fixed(" "), 2, TRUE)
+  df.temp$buyer.code <- str_extract(df.temp$buyer.name, "[A-Z]{3}-[0-9]{3}")
+  df.temp$buyer.name <- str_split(df.temp$buyer.name, " [(]*[A-Z]{3}-[0-9]{3}[)]*", 2, TRUE)[,1]
+  df.temp$location <- NA
+  df.temp$money <- floor(df.temp$money / 100.0)
+  df.sales <- rbind(df.sales, df.temp[,colnames(df.sales)])
 }
 
-if (!identical(find("df.buys"), character(0))) {
-  message(paste(format(Sys.time(), "%H:%M:%OS3"), "Fixing names of renamed buyers -> df.buys (requires mod)"))
-  df.buys$buyer.station <- as.character(df.stations$name[match(df.buys$buyer.code, df.stations$code)])
-  df.buys$buyer.ship <- as.character(df.ships$name[match(df.buys$buyer.code, df.ships$code)])
-  df.buys$buyer.name <- as.character(df.buys$buyer.name)
-  df.buys$buyer.name[!is.na(df.buys$buyer.station)] <- as.character(df.buys$buyer.station[!is.na(df.buys$buyer.station)])
-  df.buys$buyer.name[!is.na(df.buys$buyer.ship)] <- as.character(df.buys$buyer.ship[!is.na(df.buys$buyer.ship)])
-  df.buys$buyer.name <- as.factor(df.buys$buyer.name)
-  df.buys$buyer.ship <- NULL
-  df.buys$buyer.station <- NULL
-} else {
-  message(paste(format(Sys.time(), "%H:%M:%OS3"), "-> No player buys found"))
+# find ship repairs
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding ship repairs -> df.sales"))
+df.temp <- df.log[which(df.log$category == "upkeep" & df.log$title == "Ship repaired"),]
+if (NROW(df.temp) > 0) {
+  df.temp[,c("wares","parse2")] <- str_split(df.temp$text, fixed(" finished repairing at station: "), 2, TRUE)
+  df.temp[,c("seller","parse3")] <- str_split(df.temp$parse2, fixed(". They have paid"), 2, TRUE)
+  df.temp$seller.name <- str_split(df.temp$seller, " [(][A-Z]{3}-[0-9]{3}[)]", 2, TRUE)[,1]
+  df.temp$seller.code <- str_extract(df.temp$seller, "[A-Z]{3}-[0-9]{3}")
+  df.temp$amount <- 1
+  df.temp$commodity <- "Ship repair"
+  df.temp[,c("buyer.faction","buyer.name")] <- str_split(df.temp$wares, fixed(" "), 2, TRUE)
+  df.temp$buyer.code <- str_extract(df.temp$buyer.name, "[A-Z]{3}-[0-9]{3}")
+  df.temp$buyer.name <- str_split(df.temp$buyer.name, " [(]*[A-Z]{3}-[0-9]{3}[)]*", 2, TRUE)[,1]
+  df.temp$money <- floor(df.temp$money / 100.0)
+  df.temp$location <- NA
+  df.sales <- rbind(df.sales, df.temp[,colnames(df.sales)])
 }
+
+# find ship resupplies
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding ship resupplies -> df.sales"))
+df.temp <- df.log[which(df.log$category == "upkeep" & df.log$title == "Ship resupplied"),]
+if (NROW(df.temp) > 0) {
+  df.temp[,c("wares","parse2")] <- str_split(df.temp$title, fixed(" finished resupplying at station: "), 2, TRUE)
+  df.temp[,c("seller","parse3")] <- str_split(df.temp$parse2, fixed(". They have paid"), 2, TRUE)
+  df.temp$seller.name <- str_split(df.temp$seller, " [(][A-Z]{3}-[0-9]{3}[)]", 2, TRUE)[,1]
+  df.temp$seller.code <- str_extract(df.temp$seller, "[A-Z]{3}-[0-9]{3}")
+  df.temp$amount <- 1
+  df.temp$commodity <- "Ship resupply"
+  df.temp[,c("buyer.faction","buyer.name")] <- str_split(df.temp$wares, fixed(" "), 2, TRUE)
+  df.temp$buyer.code <- str_extract(df.temp$buyer.name, "[A-Z]{3}-[0-9]{3}")
+  df.temp$buyer.name <- str_split(df.temp$buyer.name, " [(]*[A-Z]{3}-[0-9]{3}[)]*", 2, TRUE)[,1]
+  df.temp$location <- NA
+  df.temp$money <- floor(df.temp$money / 100.0)
+  df.sales <- rbind(df.sales, df.temp[,colnames(df.sales)])
+}
+
+# some housekeeping on the sales table
+if (!identical(find("df.sales"), character(0))) {
+  df.sales <- df.sales[order(df.sales$time, decreasing = TRUE),]
+  # adding names for ships/stations that still have default name
+  # df.temp <- df.playerowned[!is.na(df.playerowned$name), c("code","name")]
+  # df.sales$seller.name[is.na(df.sales$seller.name)] <- df.temp$name[match(df.sales$seller.code[is.na(df.sales$seller.name)], df.temp$code)]
+  # df.sales$buyer.faction <- factor(as.character(df.sales$buyer.faction), levels = factions.levels, ordered = TRUE)
+  df.sales$seller.name <- as.factor(df.sales$seller.name)
+  df.sales$seller.code <- as.factor(df.sales$seller.code)
+  df.sales$commodity <- as.factor(df.sales$commodity)
+  # df.sales$location <- as.factor(df.sales$location)
+  # df.sales$money <- as.integer(df.sales$money)
+  # df.sales$amount <- as.integer(df.sales$amount)
+} else {
+  message(paste(format(Sys.time(), "%H:%M:%OS3"), "-> No sales found"))
+}
+
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Gathering buys -> df.buys"))
+df.buys <- df.tradelog[which(df.tradelog$seller.faction != "PLA" & df.tradelog$buyer.faction == "PLA"), c("time","money","buyer.name","buyer.code","amount","commodity","seller.faction","seller.name","seller.code")]
+df.buys$money <- -df.buys$money
 
 # gathering info on destroyed objects
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Preparing destroyed player owned objects -> df.destroyed"))
@@ -586,6 +768,28 @@ if (NROW(df.temp) > 0) {
   df.transfers <- rbind(df.transfers, df.temp)
 }
 
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding pirate harassments -> df.pirates"))
+df.pirates <- df.log[str_detect(df.log$title, fixed("Pirate Harassment")), c("time","text")]
+df.pirates <- cbind(df.pirates[,"time",drop=FALSE], setNames(as.data.frame(str_split(df.pirates$text, " in |[.]?.{1}\\\\012.{1}", simplify = TRUE))[,c(1,2,4,5)], c("ship","sector.name","pirate","response")))
+df.pirates <- left_join(df.pirates, df.sectors[,c("name","sector.macro")], by = c("sector.name" = "name"))
+df.pirates$ship.code <- str_extract(df.pirates$ship, "[A-Z]{3}-[0-9]{3}$")
+df.pirates$ship.name <- sub(" [A-Z]{3}-[0-9]{3}$", "", df.pirates$ship)
+df.pirates$pirate.code <- str_extract(df.pirates$pirate, "[A-Z]{3}-[0-9]{3}$")
+df.pirates$pirate.faction <- factor(str_extract(df.pirates$pirate, "^[A-Z]{3}"), levels = factions.levels, ordered = TRUE)
+df.pirates$pirate.name <- sub("^[A-Z]{3} ", "", sub(" [A-Z]{3}-[0-9]{3}$", "", df.pirates$pirate))
+df.pirates$response <- factor(sub("^Response: ", "", df.pirates$response))
+df.pirates <- df.pirates[,c("time","ship.name","ship.code","sector.macro","sector.name","pirate.name","pirate.code","pirate.faction","response")]
+
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding police interdictions -> df.police"))
+df.police <- df.log[str_detect(df.log$title, fixed("Police Interdiction")), c("time","text")]
+df.police <- cbind(df.police[,"time",drop=FALSE], setNames(as.data.frame(str_split(df.police$text, " in | by | police to stop |[.]?.{1}\\\\012.{1}", simplify = TRUE))[,c(1,2,4,6)], c("ship","sector.name","faction.name","response")))
+df.police <- left_join(df.police, df.sectors[,c("name","sector.macro")], by = c("sector.name" = "name"))
+df.police$police.faction <- factor(factions.levels[match(df.police$faction, factions.names)], levels = factions.levels, ordered = TRUE)
+df.police$ship.code <- str_extract(df.police$ship, "[A-Z]{3}-[0-9]{3}$")
+df.police$ship.name <- sub(" [A-Z]{3}-[0-9]{3}$", "", df.police$ship)
+df.police$response <- factor(sub("^Response: ", "", df.police$response))
+df.police <- df.police[,c("time","ship.name","ship.code","sector.macro","sector.name","police.faction","response")]
+
 
 # enough data gathering, let's generate some visuals now
 logged_hours <- (max(df.log$time) - min(df.log$time)) / 3600.0
@@ -598,6 +802,8 @@ dashboard.html <- "<html>"
 # sector map
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Generating sector map"))
 plot.title <- "Sector map"
+overlay.hours <- 24
+time.overlay <- time.now - 3600 * 24
 
 # aspect ratio calculations
 df.plot.clusters <- setNames(df.clusterdata[df.clusterdata$macro %in% df.sectors$cluster.macro, c(2,4,5,1)], c("x","y","name","macro"))
@@ -610,7 +816,7 @@ y.range <- c(-86600000 , 147220000)   #range(df.plot.clusters$y) + c(-y.div, y.d
 if (spoilers.hide) { df.plot.clusters <- df.plot.clusters[which(df.plot.clusters$macro %in% unique(df.sectors$cluster.macro[which(df.sectors$knownto == "player")])),] }
 
 # get sectors and add some plot attributes
-df.plot.sectors <- left_join(left_join(df.plot.clusters, df.sectordata[,c("cluster","macro")], by = c("macro" = "cluster"))[,c(1,2,3,5)], df.sectors, by = c("macro.y" = "macro"))[,c("x","y","owner","contested","name.y","knownto")]
+df.plot.sectors <- left_join(left_join(df.plot.clusters, df.sectordata[,c("cluster","macro")], by = c("macro" = "cluster"), multiple = "all")[,c(1,2,3,5)], df.sectors, by = c("macro.y" = "macro"))[,c("x","y","owner","contested","name.y","knownto")]
 colnames(df.plot.sectors)[5] <- "name"
 
 if (spoilers.hide) { df.plot.sectors <- df.plot.sectors[which(df.plot.sectors$knownto == "player"),] }
@@ -618,18 +824,18 @@ df.plot.sectors$colour <- factions.colours[match(df.plot.sectors$owner, sector.o
 df.plot.sectors$ownername <- factions.names[match(df.plot.sectors$owner, sector.owners)]
 df.plot.sectors$sizecat <- "b"
 # adjusting x,y coords and names of sectors in multi-sector clusters. There's probably a dynamic way to do this
-xadjmin <- c("Earth","Saturn 2","Titan","Emperors Pride IV","Litany of Fury XII","Savage Spur II","Atiyas Misfortune I","Faulty Logic VII","Black Hole Sun IV",
-             "Hatikvahs Choice I","Tharkas Cascade XVII","Nopileos Fortune II","Scale Plate Green VII","Turquoise Sea IX",
-             "Ianamus Zura IV","Thuruks Demise III","Guiding Star VII","Hewas Twin I","Hewas Twin III")
-xadjplus <- c("The Moon","Emperors Pride VI","Litany of Fury IX","Savage Spur I","Atiyas Misfortune III","Faulty Logic I","Black Hole Sun V",
-              "Hatikvahs Choice III","Tharkas Cascade XV","Grand Exchange I","Grand Exchange IV","Nopileos Fortune VI","Scale Plate Green I","Turquoise Sea X",
-              "Ianamus Zura VII","Thuruks Demise II First Impact","Guiding Star V","Hewas Twin II","Hewas Twin IV The Cove","Avarice I","Avarice V Dead End")
-yadjmin <- c("The Moon","Titan","Emperors Pride IV","Litany of Fury IX","Savage Spur II","Atiyas Misfortune III","Faulty Logic VII","Black Hole Sun V",
-             "Hatikvahs Choice I","Tharkas Cascade XV","Grand Exchange I","Nopileos Fortune VI","Scale Plate Green I","Turquoise Sea X",
-             "Ianamus Zura IV","Thuruks Demise II First Impact","Guiding Star V","Hewas Twin I","Hewas Twin IV The Cove","Avarice V Dead End")
-yadjplus <- c("Earth","Saturn 2","Emperors Pride VI","Litany of Fury XII","Savage Spur I","Atiyas Misfortune I","Faulty Logic I","Black Hole Sun IV",
-              "Hatikvahs Choice III","Tharkas Cascade XVII","Grand Exchange IV","Nopileos Fortune II","Scale Plate Green VII","Turquoise Sea IX",
-              "Ianamus Zura VII","Thuruks Demise III","Guiding Star VII","Hewas Twin II","Hewas Twin III","Avarice I")
+xadjmin <- c("Earth","Saturn 2","Titan","Emperor's Pride IV","Litany of Fury XII","Savage Spur II","Atiya's Misfortune I","Faulty Logic VII","Black Hole Sun IV",
+             "Hatikvah's Choice I","Tharka's Cascade XVII","Nopileos' Fortune II","Scale Plate Green VII","Turquoise Sea IX",
+             "Ianamus Zura IV","Thuruk's Demise III","Guiding Star VII","Hewa's Twin I","Hewa's Twin III")
+xadjplus <- c("The Moon","Emperor's Pride VI","Litany of Fury IX","Savage Spur I","Atiya's Misfortune III","Faulty Logic I","Black Hole Sun V",
+              "Hatikvah's Choice III","Tharka's Cascade XV","Grand Exchange I","Grand Exchange IV","Nopileos' Fortune VI","Scale Plate Green I","Turquoise Sea X",
+              "Ianamus Zura VII","Thuruk's Demise II First Impact","Guiding Star V","Hewa's Twin II","Hewa's Twin IV The Cove","Avarice I","Avarice V Dead End")
+yadjmin <- c("The Moon","Titan","Emperor's Pride IV","Litany of Fury IX","Savage Spur II","Atiya's Misfortune III","Faulty Logic VII","Black Hole Sun V",
+             "Hatikvah's Choice I","Tharka's Cascade XV","Grand Exchange I","Nopileos' Fortune VI","Scale Plate Green I","Turquoise Sea X",
+             "Ianamus Zura IV","Thuruk's Demise II First Impact","Guiding Star V","Hewa's Twin I","Hewa's Twin IV The Cove","Avarice V Dead End")
+yadjplus <- c("Earth","Saturn 2","Emperor's Pride VI","Litany of Fury XII","Savage Spur I","Atiya's Misfortune I","Faulty Logic I","Black Hole Sun IV",
+              "Hatikvah's Choice III","Tharka's Cascade XVII","Grand Exchange IV","Nopileos' Fortune II","Scale Plate Green VII","Turquoise Sea IX",
+              "Ianamus Zura VII","Thuruk's Demise III","Guiding Star VII","Hewa's Twin II","Hewa's Twin III","Avarice I")
 alladj <- unique(c(xadjmin, xadjplus, yadjmin, yadjplus))
 # there's always a few that want to be speshul
 df.plot.text <- df.plot.sectors[df.plot.sectors$name %in% c(alladj, "Grand Exchange III", "Saturn 1", "Avarice IV"),]
@@ -658,17 +864,65 @@ df.plot.text$x[which(df.plot.text$altname == "Avarice")] <- df.plot.text$x[which
 df.plot.text$x[which(df.plot.text$altname == "Grand Exchange")] <- df.plot.text$x[which(df.plot.text$altname == "Grand Exchange")] + x.div/8
 df.plot.text <- df.plot.text[!is.na(df.plot.text$altname),]
 
+df.temp <- df.police[df.police$time > time.overlay, c("sector.name","sector.macro")]
+df.temp <- aggregate(df.temp$sector.macro, by = list(name = df.temp$sector.name), FUN = "length")
+colnames(df.temp)[2] <- "interdictions"
+df.plot.police <- inner_join(df.plot.sectors, df.temp, by = "name")[,c("x","y","knownto","sizecat","interdictions","name")]
+df.plot.police$scale <- df.plot.police$interdictions / max(df.plot.police$interdictions, na.rm = TRUE)
+
+df.temp <- df.pirates[df.pirates$time > time.overlay, c("sector.name","sector.macro")]
+df.temp <- aggregate(df.temp$sector.macro, by = list(name = df.temp$sector.name), FUN = "length")
+colnames(df.temp)[2] <- "harassments"
+df.plot.pirates <- inner_join(df.plot.sectors, df.temp, by = "name")[,c("x","y","knownto","sizecat","harassments","name")]
+df.plot.pirates$scale <- df.plot.pirates$harassments / max(df.plot.pirates$harassments, na.rm = TRUE)
+
+df.temp <- left_join(left_join(left_join(df.plot.sectors[,"name", drop = FALSE],
+                                         df.plot.police[,c("name","interdictions")],
+                                         by = "name"),
+                               df.plot.pirates[,c("name","harassments")],
+                               by = "name"),
+                     df.sectors[,c("name", intersect(wares.levels, colnames(df.sectors)))],
+                     by = "name" )
+for (res in intersect(wares.levels, colnames(df.sectors))) {
+  quant <- quantile(df.temp[which(df.temp[,res] > 0.0), res], na.rm = TRUE)
+  df.temp[,res] <- case_when(df.temp[,res] >= quant[4] ~ 3,
+                             df.temp[,res] >= quant[3] ~ 2,
+                             df.temp[,res] > 0.0       ~ 1,
+                             TRUE                      ~ 0)
+}
+df.plot.sectors <- left_join(df.plot.sectors, df.temp, by = "name")
+df.plot.sectors$tooltip <- paste0("<b>", df.plot.sectors$name, "</b>", "<br>",
+                                  ifelse(!is.na(df.plot.sectors$contested), paste(df.plot.sectors$ownername, "<b>(Contested)</b>"), df.plot.sectors$ownername), "<br>",
+                                  ifelse(is.na(df.plot.sectors$interdictions), "", paste0(overlay.hours, "h Police Interdictions: ", df.plot.sectors$interdictions, "<br>")),
+                                  ifelse(is.na(df.plot.sectors$harassments), "", paste0(overlay.hours, "h Pirate Harassments: ", df.plot.sectors$harassments, "<br>")),
+                                  "<b>Resources</b>")
+lvls <- c("Low","Medium","High")
+for (lvl in rev(seq_along(lvls))) {
+  df.plot.sectors$tooltip <- paste0(df.plot.sectors$tooltip, "<br>", lvls[lvl], ": ")
+  for (res in intersect(wares.levels, colnames(df.plot.sectors))) {
+    idx <- which(df.plot.sectors[,res] == lvl)
+    df.plot.sectors$tooltip[idx] <- paste0(df.plot.sectors$tooltip[idx], wares.names[match(res, wares.levels)], ", ")
+  }
+  idx <- which(rowSums(df.plot.sectors[,intersect(wares.levels, colnames(df.plot.sectors))] == lvl) == 0)
+  df.plot.sectors$tooltip[idx] <- paste0(df.plot.sectors$tooltip[idx], "None")
+  df.plot.sectors$tooltip[-idx] <- substr(df.plot.sectors$tooltip[-idx], 1, nchar(df.plot.sectors$tooltip[-idx]) - 2)
+}
+
+
 # sizex/sizey = image size (keep it at 16x9 AR), marker.big/small = marker sizes in px, marker.border = owner colour border in px,
 # marker.contested.big/small = size of the contested crosses
 # font.size.map/legend = font sizes for the map/legend text
-sizex <- 1536; sizey <- 864; marker.big <- 62; marker.small <- 25; marker.border <- 6; marker.contested.big <- 45; marker.contested.small <- 20
+# sizex <- 1536; sizey <- 864; marker.big <- 62; marker.small <- 25; marker.border <- 6; marker.contested.big <- 45; marker.contested.small <- 20
 makeMap <- function(sizex, sizey, marker.big, marker.small, marker.border, marker.contested.big, marker.contested.small, font.size.map = 8, font.size.legend = 13) {
   marker.opacity <- 0.6
   marker.symbol <- "hexagon2-open"
-  marker.contested <- "x"
+  marker.contested <- "diamond-x"
+  marker.pirates <- "star-triangle-down"
+  marker.police <- "star"
   p <- plot_ly(width = sizex, height = sizey,
                type = "scatter", mode = "markers", name = "Cluster Outlines", hoverinfo = "skip",
-               showlegend = TRUE, legendgroup = "Base Map", legendgrouptitle = list(font = list(color = "#b0b0b0"), text = "Base Map"),
+               showlegend = TRUE, legendgroup = "Base Map",
+               legendgrouptitle = list(font = list(color = "#b0b0b0"), text = "Base Map"),
                x = df.plot.clusters$x, y = df.plot.clusters$y,
                marker = list(color = "#B0B0B0", opacity = marker.opacity, size = marker.big + marker.border,
                              symbol = marker.symbol, line = list(width = 2)))
@@ -678,12 +932,25 @@ makeMap <- function(sizex, sizey, marker.big, marker.small, marker.border, marke
                        marker = list(color = "#F0F0F0", opacity = marker.opacity,
                                      size = ifelse(df.plot.sectors$sizecat == "b", marker.big + marker.border, marker.small + marker.border),
                                      symbol = marker.symbol, line = list(width = 2)))
-  p <- p %>% add_trace(type = "scatter", mode = "markers", name = "Contested", hoverinfo = "skip",
-                       showlegend = TRUE, legendgroup = "Base Map",
+  p <- p %>% add_trace(type = "scatter", mode = "markers", name = "Contested Sectors", hoverinfo = "skip",
+                       showlegend = TRUE, legendgroup = "Overlays", visible = "legendonly", legendrank = 1001,
+                       legendgrouptitle = list(font = list(color = "#b0b0b0"), text = "Overlays"),
                        x = df.plot.sectors$x[!is.na(df.plot.sectors$contested)], y = df.plot.sectors$y[!is.na(df.plot.sectors$contested)],
-                       marker = list(color = "#EE3333", opacity = marker.opacity,
+                       marker = list(color = "#EEEE33", opacity = marker.opacity,
                                      size = ifelse(df.plot.sectors$sizecat[!is.na(df.plot.sectors$contested)] == "b", marker.contested.big, marker.contested.small),
-                                     symbol = marker.contested, line = list(color = "#000000", opacity = 0.0, width = 0)))
+                                     symbol = marker.contested, line = list(color = "#ffffff", opacity = marker.opacity, width = 1)))
+  p <- p %>% add_trace(type = "scatter", mode = "markers", name = paste0("Police Interdictions (", overlay.hours, "h)"), hoverinfo = "skip",
+                       showlegend = TRUE, legendgroup = "Overlays", visible = "legendonly", legendrank = 1001,
+                       x = df.plot.police$x, y = df.plot.police$y,
+                       marker = list(color = "#3333EE", opacity = marker.opacity,
+                                     size = as.integer(1 + round(df.plot.police$scale * ifelse(df.plot.police$sizecat == "b", marker.contested.big - 1, marker.contested.small - 1))),
+                                     symbol = marker.police, line = list(color = "#ffffff", opacity = marker.opacity, width = 1)))
+  p <- p %>% add_trace(type = "scatter", mode = "markers", name = paste0("Pirate Harassments (", overlay.hours, "h)"), hoverinfo = "skip",
+                       showlegend = TRUE, legendgroup = "Overlays", visible = "legendonly", legendrank = 1001,
+                       x = df.plot.pirates$x, y = df.plot.pirates$y,
+                       marker = list(color = "#EE3333", opacity = marker.opacity,
+                                     size = as.integer(1 + round(df.plot.pirates$scale * ifelse(df.plot.pirates$sizecat == "b", marker.contested.big - 1, marker.contested.small - 1))),
+                                     symbol = marker.pirates, line = list(color = "#ffffff", opacity = marker.opacity, width = 1)))
   
   for (o in intersect(sector.owners, df.plot.sectors$owner)) {
     df.temp <- df.plot.sectors[which(df.plot.sectors$owner == o),]
@@ -691,9 +958,10 @@ makeMap <- function(sizex, sizey, marker.big, marker.small, marker.border, marke
     pcol <- head(df.temp$colour, 1)
     oname <- head(df.temp$ownername, 1)
     p <- p %>% add_trace(type = "scatter", mode = "markers", name = oname, hoverinfo = "text",
-                         showlegend = TRUE, legendgroup = "Factions", legendgrouptitle = list(font = list(color = "#b0b0b0"), text = "Factions"),
+                         showlegend = TRUE, legendgroup = "Factions", legendgrouptitle = list(font = list(color = "#b0b0b0"), text = "Factions"), legendrank = 999,
                          x = df.temp$x, y = df.temp$y,
-                         hovertext = ifelse(!is.na(df.temp$contested), paste(df.temp$name, paste(df.temp$ownername, "(Contested)"), sep = "<br>"), paste(df.temp$name, df.temp$ownername, sep = "<br>")),
+                         #hovertext = paste(df.temp$name, ifelse(!is.na(df.temp$contested), paste(df.temp$ownername, "(Contested)"), df.temp$ownername), sep = "<br>"),
+                         hovertext = df.temp$tooltip,
                          marker = list(color = pcol, opacity = marker.opacity,
                                        size = ifelse(df.temp$sizecat == "b", marker.big, marker.small),
                                        symbol = marker.symbol,
@@ -701,7 +969,7 @@ makeMap <- function(sizex, sizey, marker.big, marker.small, marker.border, marke
   }
   p <- p %>% add_trace(type = "scatter", mode = "markers+text", name = "Sector Names", hoverinfo = "skip",
                        showlegend = TRUE, legendgroup = "Base Map",
-                       textfont = list(size = font.size.map, color = "#f0f060"),
+                       textfont = list(size = font.size.map, color = "#f0f060a0"),
                        x = df.plot.text$x, y = df.plot.text$y, text = paste0("<b>", gsub(" (?![IVX]+ )(?![IVX]+$)(?!of )(?!to )(?!Sun$)(?!Plate )(?!First )(?!Dead )", "<br>", df.plot.text$altname, perl = TRUE), "</b>"),
                        marker = list(color = "#000000", opacity = 0.0, size = 0,
                                      line = list(color = "#000000", opacity = 0.0, width = 0)))
@@ -709,8 +977,9 @@ makeMap <- function(sizex, sizey, marker.big, marker.small, marker.border, marke
                     margin = list(b = 0, l = 0, r = 0, t = 0),
                     legend = list(x = 0.0, y = 1.0, itemsizing = "constant",
                                   groupclick = "toggleitem",
+                                  orientation = "h", traceorder = "grouped",
                                   font = list(size = font.size.legend, color = "#b0b0b0"),
-                                  bgcolor = "#0f0f0f", bordercolor = "#808080", borderwidth = 2),
+                                  bgcolor = "#0f0f0f00"),
                     xaxis = list(range = x.range, fixedrange = TRUE,
                                  visible = FALSE, showgrid = FALSE, showline = FALSE, showticklabels = FALSE, ticks = ""),
                     yaxis = list(range = y.range, fixedrange = TRUE,
@@ -720,8 +989,9 @@ makeMap <- function(sizex, sizey, marker.big, marker.small, marker.border, marke
 # make the map. If you want to change the map size you will also have to adjust the marker sizes to fit.
 # there's no magic formula, use basic calculus and trial&error :)
 # this works for 1920x1080 in case you want it as desktop background: makeMap(1920, 1080, 80, 33, 7, 55, 26)
-p <- makeMap(1536, 864, 62, 25, 6, 45, 20)
+p <- makeMap(1536, 864, 62, 25, 6, 44, 20)
 saveWidget(p, paste0(path.Output, "/files/", plot.title, "_", game.guid, ".html"), selfcontained = FALSE, libdir = "lib")
+
 # I suck at html/css, so let's keep things simple
 dashboard.html <- paste0(dashboard.html, "<p>")
 dashboard.html <- paste0(dashboard.html, tags$iframe(src = paste0("files/", plot.title, "_", game.guid, ".html"), style = "margin:0; width:1536px; height:864px; border:none; overflow:hidden;", scrolling = "no"))
@@ -732,13 +1002,13 @@ dashboard.html <- paste0(dashboard.html, "</p>")
 # However it's reportedly deprecated on plotly side so not sure how long it will work
 # You can just save the map as png from the hover menu at the top right of the map instead
 # message(paste(format(Sys.time(), "%H:%M:%OS3"), "Generating sector map as desktop wallpaper image (requires orca)"))
-# p <- makeMap(1920, 1080, 80, 33, 7, 55, 26)
-# orca(p, past0(path.Output, "/X4Map.png"))
+# p <- makeMap(1920, 1080, 80, 33, 7, 55, 26, 9)
+# orca(p, "../Pictures/X4Map.png")
 
 # generating the bar and stacked area plots
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Generating bar and area plots"))
 sample_smoothing <- 1
-avg_smoothing <- 6
+avg_smoothing <- 12
 
 if (!identical(find("df.sales"), character(0))) {
   maxtime <- max(df.sales$time)
@@ -803,9 +1073,13 @@ if (!identical(find("df.sales"), character(0))) {
   }
   
   plot.title <- "Commodity Sales per Seller"
-  df.temp <- df.sales[which(df.sales$money > 0 & !df.sales$commodity %in% c("Ship construction","Ship repair","Ship resupply")), c("time","seller.name","money")]
+  df.temp <- df.sales[which(df.sales$money > 0 & !df.sales$commodity %in% c("Ship construction","Ship repair","Ship resupply")), c("time","seller.name","seller.code","money")]
   if (nrow(df.temp) > 0) {
     message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", plot.title))
+    df.temp$seller.name <- as.character(df.temp$seller.name)
+    idx <- which(!(df.temp$seller.code %in% df.stations$code))
+    df.temp$seller.name[idx] <- paste0(df.temp$seller.name[idx], " (", df.temp$seller.code[idx], ")")
+    df.temp$seller.name <- as.factor(df.temp$seller.name)
     df.plot <- data.frame(time = trunc((df.temp$time - maxtime) / (sample_smoothing*3600)) * sample_smoothing, seller = df.temp$seller.name, money = df.temp$money)
     df.plot <- df.plot[!is.na(df.plot$seller),]
     vals.time <- unique(df.plot$time)
@@ -834,9 +1108,13 @@ if (!identical(find("df.sales"), character(0))) {
   
   if (!identical(find("df.buys"), character(0))) {
     plot.title <- "Commodity Buys per Buyer"
-    df.temp <- df.buys[which(df.buys$money < 0), c("time","buyer.name","money")]
+    df.temp <- df.buys[which(df.buys$money < 0), c("time","buyer.name","buyer.code","money")]
     if (nrow(df.temp) > 0) {
       message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", plot.title))
+      df.temp$buyer.name <- as.character(df.temp$buyer.name)
+      idx <- which(!(df.temp$buyer.code %in% df.stations$code))
+      df.temp$buyer.name[idx] <- paste0(df.temp$buyer.name[idx], " (", df.temp$buyer.code[idx], ")")
+      df.temp$buyer.name <- as.factor(df.temp$buyer.name)
       df.plot <- data.frame(time = trunc((df.temp$time - maxtime) / (sample_smoothing*3600)) * sample_smoothing, buyer = df.temp$buyer.name, money = -df.temp$money)
       df.plot <- df.plot[!is.na(df.plot$buyer),]
       vals.time <- unique(df.plot$time)
@@ -864,8 +1142,9 @@ if (!identical(find("df.sales"), character(0))) {
     }
     
     plot.title <- "Costs vs Profits"
-    df.temp <- df.sales[which(df.sales$money > 0), c("time","money")]
-    df.temp2 <- df.buys[which(df.buys$money < 0), c("time","money")]
+    tl <- max(c(min(df.tradelog$time), min(df.log$time)))
+    df.temp <- df.sales[which(df.sales$money > 0 & df.sales$time > tl), c("time","money")]
+    df.temp2 <- df.buys[which(df.buys$money < 0 & df.buys$time > tl), c("time","money")]
     if (nrow(df.temp) > 0) {
       message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", plot.title))
       df.plot <- data.frame(time = trunc((df.temp$time - maxtime) / (sample_smoothing*3600)) * sample_smoothing, money = df.temp$money)
@@ -943,7 +1222,7 @@ sbplots <- c()
 
 if (!identical(find("df.sales"), character(0))) {
   plot.title1 <- paste0(history.hours, "h Ship Sales per Wharf")
-  df.temp <- df.sales[which(df.sales$time > time.limit & df.sales$commodity == "Ship construction" & df.sales$money > 0), c("seller.name","buyer.faction","commodity","buyer.object","money","amount")]
+  df.temp <- df.sales[which(df.sales$time > time.limit & df.sales$commodity == "Ship construction" & df.sales$money > 0), c("seller.name","buyer.faction","commodity","buyer.name","money","amount")]
   if (nrow(df.temp) > 0) {
     message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", plot.title1))
     plot.total <- sum(df.temp$money)
@@ -953,7 +1232,7 @@ if (!identical(find("df.sales"), character(0))) {
     df.plot <- rbind(df.plot, data.frame(ID = df.temp2$station, label = df.temp2$station, value = df.temp2$money, parent = "total", color = rgb(colorRamp(c("brown","orange"))((as.integer(df.temp2$station))/max(as.integer(df.temp2$station))), maxColorValue = 255)))
     df.temp2 <- aggregate(df.temp[, "money", drop = FALSE], by = list(station = df.temp$seller.name, faction = df.temp$buyer.faction), FUN = "sum")
     df.plot <- rbind(df.plot, data.frame(ID = paste(df.temp2$station, df.temp2$faction, sep = ">>"), label = df.temp2$faction, value = df.temp2$money, parent = df.temp2$station, color = sbFactionColor(df.temp2$faction, 1)))
-    df.temp2 <- aggregate(df.temp[, c("money","amount")], by = list(station = df.temp$seller.name, faction = df.temp$buyer.faction, ship = df.temp$buyer.object), FUN = "sum")
+    df.temp2 <- aggregate(df.temp[, c("money","amount")], by = list(station = df.temp$seller.name, faction = df.temp$buyer.faction, ship = df.temp$buyer.name), FUN = "sum")
     df.plot <- rbind(df.plot, data.frame(ID = paste(df.temp2$station, df.temp2$faction, df.temp2$ship, sep = ">>"), label = paste0(df.temp2$amount, " x<br>", df.temp2$ship), value = df.temp2$money, parent = paste(df.temp2$station, df.temp2$faction, sep = ">>"), color = sbFactionColor(df.temp2$faction, 2)))
     df.plot$label[1] <- paste(df.plot$label[1], paste0(format(df.plot$value[1], trim = TRUE, big.mark = ","), " Cr."), paste(format(round(plot.total / ((time.now - time.limit) / 3600.0)), trim = TRUE, big.mark = ","), "Cr/h"), sep = "<br>")
     df.plot$label[-1] <- paste(df.plot$label[-1], paste0(format(df.plot$value[-1], trim = TRUE, big.mark = ","), " Cr."), paste0(format(100.0 * df.plot$value[-1] / plot.total, digits = 1, scientific = FALSE, trim = TRUE), "%"), sep = "<br>")
@@ -963,14 +1242,14 @@ if (!identical(find("df.sales"), character(0))) {
   }
   
   plot.title2 <- paste0(history.hours, "h Ship Sales per Faction")
-  df.temp <- df.sales[which(df.sales$time > time.limit & df.sales$commodity == "Ship construction" & df.sales$money > 0), c("seller.name","buyer.faction","commodity","buyer.object","money","amount")]
+  df.temp <- df.sales[which(df.sales$time > time.limit & df.sales$commodity == "Ship construction" & df.sales$money > 0), c("seller.name","buyer.faction","commodity","buyer.name","money","amount")]
   if (nrow(df.temp) > 0) {
     message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", plot.title2))
     plot.total <- sum(df.temp$money)
     df.plot <- data.frame(ID = "total", label = "Total", value = plot.total, parent = "", color = "#FFFFFF", stringsAsFactors = FALSE)
     df.temp2 <- aggregate(df.temp[, "money", drop = FALSE], by = list(faction = df.temp$buyer.faction), FUN = "sum")
     df.plot <- rbind(df.plot, data.frame(ID = df.temp2$faction, label = df.temp2$faction, value = df.temp2$money, parent = "total", color = sbFactionColor(df.temp2$faction, 1)))
-    df.temp2 <- aggregate(df.temp[, c("money","amount")], by = list(faction = df.temp$buyer.faction, ship = df.temp$buyer.object), FUN = "sum")
+    df.temp2 <- aggregate(df.temp[, c("money","amount")], by = list(faction = df.temp$buyer.faction, ship = df.temp$buyer.name), FUN = "sum")
     df.plot <- rbind(df.plot, data.frame(ID = paste(df.temp2$faction, df.temp2$ship, sep = ">>"), label = paste0(df.temp2$amount, " x<br>", df.temp2$ship), value = df.temp2$money, parent = df.temp2$faction, color = sbFactionColor(df.temp2$faction, 2)))
     df.plot$label[1] <- paste(df.plot$label[1], paste0(format(df.plot$value[1], trim = TRUE, big.mark = ","), " Cr."), paste(format(round(plot.total / ((time.now - time.limit) / 3600.0)), trim = TRUE, big.mark = ","), "Cr/h"), sep = "<br>")
     df.plot$label[-1] <- paste(df.plot$label[-1], paste0(format(df.plot$value[-1], trim = TRUE, big.mark = ","), " Cr."), paste0(format(100.0 * df.plot$value[-1] / plot.total, digits = 1, scientific = FALSE, trim = TRUE), "%"), sep = "<br>")
@@ -980,9 +1259,14 @@ if (!identical(find("df.sales"), character(0))) {
   }
   
   plot.title1 <- paste0(history.hours, "h Commodity Sales by Faction")
-  df.temp <- df.sales[which(df.sales$time > time.limit & df.sales$money > 0 & !df.sales$commodity %in% c("Ship construction","Ship repair","Ship resupply")), c("seller.name","buyer.faction","commodity","buyer.object","money","amount")]
+  df.temp <- df.sales[which(df.sales$time > time.limit & df.sales$money > 0 & !df.sales$commodity %in% c("Ship construction","Ship repair","Ship resupply")), c("seller.name","seller.code","buyer.faction","commodity","buyer.name","money","amount")]
   if (nrow(df.temp) > 0) {
     message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", plot.title1))
+    df.temp$seller.name <- as.character(df.temp$seller.name)
+    idx <- which(!(df.temp$seller.code %in% df.stations$code))
+    df.temp$seller.name[idx] <- paste0(df.temp$seller.name[idx], " (", df.temp$seller.code[idx], ")")
+    df.temp$seller.name <- as.factor(df.temp$seller.name)
+    df.temp$commodity <- wares.names[match(df.temp$commodity, wares.levels)]
     plot.total <- sum(df.temp$money)
     df.plot <- data.frame(ID = "total", label = "Total", value = plot.total, parent = "", color = "#FFFFFF", stringsAsFactors = FALSE)
     df.temp2 <- aggregate(df.temp$money, by = list(faction = df.temp$buyer.faction), FUN = "sum")
@@ -1018,9 +1302,14 @@ if (!identical(find("df.sales"), character(0))) {
 
 if (!identical(find("df.buys"), character(0))) {
   plot.title2 <- paste0(history.hours, "h Commodity Buys by Commodity")
-  df.temp <- df.buys[which(df.buys$time > time.limit & df.buys$money < 0), c("seller.object","seller.faction","commodity","buyer.name","money","amount")]
+  df.temp <- df.buys[which(df.buys$time > time.limit & df.buys$money < 0), c("seller.name","seller.faction","commodity","buyer.name","buyer.code","money","amount")]
   if (nrow(df.temp) > 0) {
     message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", plot.title2))
+    df.temp$buyer.name <- as.character(df.temp$buyer.name)
+    idx <- which(!(df.temp$buyer.code %in% df.stations$code))
+    df.temp$buyer.name[idx] <- paste0(df.temp$buyer.name[idx], " (", df.temp$buyer.code[idx], ")")
+    df.temp$buyer.name <- as.factor(df.temp$buyer.name)
+    df.temp$commodity <- wares.names[match(df.temp$commodity, wares.levels)]
     plot.total <- sum(-df.temp$money)
     df.plot <- data.frame(ID = "total", label = "Total", value = plot.total, parent = "", stringsAsFactors = FALSE)
     df.temp2 <- aggregate(-df.temp$money, by = list(commodity = df.temp$commodity), FUN = "sum")
@@ -1036,11 +1325,8 @@ if (!identical(find("df.buys"), character(0))) {
     saveWidget(p, paste0(path.Output, "/files/", plot.title2, "_", game.guid, ".html"), selfcontained = FALSE, libdir = "lib")
     
     sbplots <- c(sbplots, paste0("files/", plot.title2, "_", game.guid, ".html"))
-  }
-  
-  plot.title2 <- paste0(history.hours, "h Commodity Buys by Buyer")
-  df.temp <- df.buys[which(df.buys$time > time.limit & df.buys$money < 0), c("seller.object","seller.faction","commodity","buyer.name","money","amount")]
-  if (nrow(df.temp) > 0) {
+
+    plot.title2 <- paste0(history.hours, "h Commodity Buys by Buyer")
     message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", plot.title2))
     plot.total <- sum(-df.temp$money)
     df.plot <- data.frame(ID = "total", label = "Total", value = plot.total, parent = "", stringsAsFactors = FALSE)
@@ -1075,7 +1361,7 @@ if (!spoilers.hide) {
   df.temp <- df.temp[which(df.temp$percentage > 0),]
   df.temp2 <- aggregate(df.temp$percentage, by = list(resource = df.temp$variable), FUN = "sum")
   df.plot <- rbind(data.frame(ID = "root", label = "Mining<br>Resources", value = sum(df.temp2$x), parent = ""),
-                   data.frame(ID = df.temp2$resource, label = Propercase(df.temp2$resource), value = df.temp2$x, parent = "root"))
+                   data.frame(ID = df.temp2$resource, label = wares.names[match(df.temp2$resource, wares.levels)], value = df.temp2$x, parent = "root"))
   df.plot <- rbind(df.plot, data.frame(ID = paste(df.temp$variable, df.temp$id, sep = ">>"), label = paste(df.sectors$name[match(df.temp$id, df.sectors$id)], paste0(0.01 * df.temp$percentage, " % (", round(df.temp$value, digits = 2), "/s)"), sep = "<br>"), value = df.temp$percentage, parent = df.temp$variable))
   p <- plot_ly(df.plot, type = "sunburst", branchvalues = "total", hoverinfo = "label", ids = ~ID, labels = ~label, parents = ~parent, values = ~value) %>% layout(title = list(text = plot.title1, font = list(size = 18)), margin = list(t = 40))
   saveWidget(p, paste0(path.Output, "/files/", plot.title1, "_", game.guid, ".html"), selfcontained = FALSE, libdir = "lib")
@@ -1093,7 +1379,7 @@ if (!spoilers.hide) {
   df.plot <- rbind(data.frame(ID = "root", label = "Resource availability<br>by Sector owner", value = sum(df.temp2$x), parent = "", color = "#FFFFFFFF"),
                    data.frame(ID = df.temp3$faction, label = factions.levels[match(df.temp3$faction, sector.owners)], value = df.temp3$x, parent = "root", color = sbSectorColor(df.temp3$faction, 1)),
                    data.frame(ID = df.temp2$id, label = df.sectors$name[match(df.temp2$id, df.sectors$id)], value = df.temp2$x, parent = df.sectors$owner[match(df.temp2$id, df.sectors$id)], color = sbSectorColor(df.sectors$owner[match(df.temp2$id, df.sectors$id)], 2)))
-  df.plot <- rbind(df.plot, data.frame(ID = paste(df.temp$id, df.temp$variable, sep = ">>"), label = paste(Propercase(df.temp$variable), paste0(0.01 * df.temp$percentage, " %"), sep = "<br>"), value = df.temp$percentage, parent = df.temp$id, color = sbSectorColor(df.temp$owner, 3)))
+  df.plot <- rbind(df.plot, data.frame(ID = paste(df.temp$id, df.temp$variable, sep = ">>"), label = paste(wares.names[match(df.temp$variable, wares.levels)], paste0(0.01 * df.temp$percentage, " %"), sep = "<br>"), value = df.temp$percentage, parent = df.temp$id, color = sbSectorColor(df.temp$owner, 3)))
   p <- plot_ly(df.plot, type = "sunburst", branchvalues = "total", hoverinfo = "label", ids = ~ID, labels = ~label, parents = ~parent, values = ~value, marker = list(colors = ~color)) %>% layout(title = list(text = plot.title2, font = list(size = 18)), margin = list(t = 40))
   saveWidget(p, paste0(path.Output, "/files/", plot.title2, "_", game.guid, ".html"), selfcontained = FALSE, libdir = "lib")
   sbplots <- c(sbplots, paste0("files/", plot.title2, "_", game.guid, ".html"))
@@ -1198,7 +1484,7 @@ if (!identical(find("df.wings"), character(0))) {
   colnames(df.temp)[1] <- "follower"
   level <- 3
   while (any(df.temp$follower %in% df.wings$leader)) {
-    df.temp2 <- inner_join(inner_join(df.temp[, "follower", drop = FALSE], df.wings, by = c("follower" = "leader")), df.ships[, c("id","name","code","sector.id")], by = c("follower.y" = "id"))
+    df.temp2 <- inner_join(inner_join(df.temp[, "follower", drop = FALSE], df.wings, by = c("follower" = "leader"), multiple = "all"), df.ships[, c("id","name","code","sector.id")], by = c("follower.y" = "id"))
     colnames(df.temp2)[1:2] <- c("id","follower")
     df.plot <- rbind(df.plot, data.frame(ID = df.temp2$follower, label = paste0(df.temp2$name, "<br>", df.temp2$code), parent = df.temp2$id, color = sbSectorColor(df.sectors$owner[match(df.temp2$sector.id, df.sectors$id)], level), stringsAsFactors = FALSE))
     df.temp <- df.temp2
@@ -1261,6 +1547,7 @@ if (!identical(find("df.sales"), character(0))) {
     colnames(df.commodities)[7] <- "Items/Trade"
     colnames(df.commodities)[8] <- "Cr/Hour"
     colnames(df.commodities)[9] <- "Trades/Hour"
+    df.commodities$Commodity <- coalesce(wares.names[match(df.commodities$Commodity, wares.levels)], df.commodities$Commodity)
     df.commodities <- df.commodities[order(df.commodities$`Cr/Hour`, decreasing = TRUE),]
     saveWidget(datatable(df.commodities, rownames = FALSE, width = 12*128, caption = tags$caption(table.title)), paste0(path.Output, "/files/", table.title, "_", game.guid, ".html"), selfcontained = FALSE, libdir = "lib")
     dashboard.html <- paste0(dashboard.html, "<p>",
@@ -1274,7 +1561,7 @@ if (!identical(find("df.sales"), character(0))) {
   df.temp <- df.sales[which(df.sales$time > time.limit & df.sales$commodity == "Ship construction" & df.sales$money > 0),]
   if (nrow(df.temp) > 0) {
     message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", table.title))
-    df.shipbuilds <- aggregate(data.frame(money = df.temp$money, count = 1, volume = df.temp$amount), list(Faction = df.temp$buyer.faction, Ship = df.temp$buyer.object), sum)
+    df.shipbuilds <- aggregate(data.frame(money = df.temp$money, count = 1, volume = df.temp$amount), list(Faction = df.temp$buyer.faction, Ship = df.temp$buyer.name), sum)
     df.shipbuilds$avg1 <- round(df.shipbuilds$money / df.shipbuilds$count)
     df.shipbuilds$avg2 <- round(df.shipbuilds$money / df.shipbuilds$volume)
     df.shipbuilds$avg3 <- round(df.shipbuilds$volume / df.shipbuilds$count)
@@ -1354,10 +1641,12 @@ cat(dashboard.html, file = paste0(path.Output, "/dashboard_", game.guid, ".html"
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Attempting to open dashboard file in default browser:", paste0(path.Output, "/dashboard_", game.guid, ".html")))
 utils::browseURL(paste0(path.Output, "/dashboard_", game.guid, ".html"))
 
+
 # free up memory hog pointers & collect garbage
 options(opt)
+#stop()
 free(result)
-rm(list = (l <- ls())[str_which(l, "df.(?!temp.*)(?!plot.*)(?!cache.*)(?!files.*)", negate = TRUE)])
+rm(list = (l <- ls())[str_which(l, "df.(?!temp.*)(?!plot.*)(?!cache.*)(?!files.*)(?!commodities)(?!destroyed)(?!sellers)(?!shipbuilds)", negate = TRUE)])
 gc()
 gc()
 
