@@ -65,3 +65,4 @@ HISTORY:
   * Some additional graphs were added, sunbursts for the wares buys, and costs vs profits both by hour and cumulative.
   * Normalized some column names across the various data frames and made some improvements to cluster and sector data file (now with more apostrophes in the names!). Also added a missing small Split transport ship to the ships data file and included a data file with names of uniquely named stations.
   * Reformatted the map legend to prevent overlapping with the Sol sectors and made the legend background transparent so that if overlapping still occurs you can at least see the map below it.
+- v1.1.1 - Small fix for a sneaky close(cache.file) error that occurred when you (re)generated the sector resource cache.
