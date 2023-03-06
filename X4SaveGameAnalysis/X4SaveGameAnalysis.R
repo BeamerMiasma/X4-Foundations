@@ -1,4 +1,4 @@
-# X4SaveGameAnalysis v1.1.0
+# X4SaveGameAnalysis v1.1.1
 # Created by Beamer Miasma 2019-now
 
 # I'll claim no copyrights myself but if you try to make money off of this you'll probably get Egosoft on your
@@ -407,7 +407,6 @@ if ((!file.exists(cache.resources)) || (cache.forceRefresh)) {
     cache.file <- file(cache.resources)
   }
   write.table(df.temp2, file = cache.file, sep = "\t", row.names = FALSE, col.names = TRUE, qmethod = "double")
-  close(cache.file)
 } else {
   message(paste(format(Sys.time(), "%H:%M:%OS3"), "Preparing sector resource info -> found resource cache file, reading", cache.resources))
   df.temp2 <- read.table(file = cache.resources, sep = "\t", row.names = NULL, header = TRUE, colClasses = "character")
