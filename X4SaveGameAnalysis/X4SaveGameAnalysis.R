@@ -117,24 +117,26 @@ Propercase <- function(value) { return(paste0(toupper(substring(value, 1, 1)), s
 factions.levels <-  c("PLA", "ARG", "ANT", "TEL", "MIN", "HOP",
                       "PAR", "ALI", "HAT", "SCA", "ZYA", "FRF",
                       "FAF", "XEN", "KHK", "PIO", "BUC", "RIP",
-                      "TER", "VIG", "YAK", "NIL")
+                      "TER", "VIG", "YAK", "NIL", "BOR")
 factions.names <-   c("Player","Argon Federation","Antigone Republic","Teladi Company","Ministry of Finance","Holy Order of the Pontifex",
                       "Godrealm of the Paranid","Alliance of the Word","Hatikvah Free League","Scale Plate Pact","Zyarth Patriarchy","Free Families",
                       "Fallen Families","Xenon","Kha'ak","Segaris Pioneers","Duke's Buccaneers","Riptide Rakers",
-                      "Terran Protectorate","Vigour Syndicate","Yaki","Ownerless")
+                      "Terran Protectorate","Vigour Syndicate","Yaki","Ownerless", "Boron")
 factions.colours <- c("#33f23a", "#0450f2", "#4c91d3", "#a2b927", "#8eb48c", "#f26ca5",
                       "#7a03f2", "#aa37c2", "#1beaf0", "#7e7732", "#fc691a", "#f19600",
                       "#ff4848", "#c10200", "lightpink", "#39ad9b", "#5500f4", "#5683a3",
-                      "#bdd2fb", "#988397", "#fe8ffa", "#808080")
+                      "#bdd2fb", "#988397", "#fe8ffa", "#808080", "blue")
 sector.owners <-    c("player", "argon", "antigone", "teladi", "ministry", "holyorder",
                       "paranid", "alliance", "hatikvah", "scaleplate", "split", "freesplit",
                       "fallensplit", "xenon", "khaak", "pioneers", "buccaneers", "scavenger",
-                      "terran", "loanshark", "yaki", "ownerless")
+                      "terran", "loanshark", "yaki", "ownerless", "boron")
 
 wares.levels <- c("advancedcomposites",
                   "advancedelectronics",
                   "antimattercells",
                   "antimatterconverters",
+                  "bofu",
+                  "bogas",
                   "cheltmeat",
                   "claytronics",
                   "computronicsubstrate",
@@ -158,6 +160,7 @@ wares.levels <- c("advancedcomposites",
                   "nividium",
                   "nostropoil",
                   "ore",
+                  "plankton",
                   "plasmaconductors",
                   "quantumtubes",
                   "rawscrap",
@@ -183,6 +186,8 @@ wares.names <- c("Advanced Composites",
                  "Advanced Electronics",
                  "Antimatter Cells",
                  "Antimatter Converters",
+                 "Bofu",
+                 "Bo-gas",
                  "Chelt Meat",
                  "Claytronics",
                  "Computronic Substrate",
@@ -206,6 +211,7 @@ wares.names <- c("Advanced Composites",
                  "Nividium",
                  "Nostrop Oil",
                  "Ore",
+                 "Plankton",
                  "Plasma Conductors",
                  "Quantum Tubes",
                  "Raw Scrap",
@@ -438,8 +444,18 @@ if (!identical(find("df.temp2"), character(0))) {
 # find all NPCs employed by the player
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Parsing player employed NPCs -> df.npcs"))
 df.temp <- data.frame()
-df.npcs <- try({df.temp <- as.data.frame(t(xpathSApply(result, "/savegame/universe//component[@class='npc' and @owner='player']", xmlAttrs, addFinalizer = TRUE)))
-                df.temp[,c("id","name",intersect(colnames(df.temp),c("code")))] })
+
+# df.npcs <- try({df.temp <- as.data.frame(t(xpathSApply(result, "/savegame/universe//component[@class='npc' and @owner='player']", xmlAttrs, addFinalizer = TRUE)))
+#                 df.temp[,c("id","name",intersect(colnames(df.temp),c("code")))] })
+df.temp <- as.data.frame(
+  do.call(rbind, lapply(
+    xpathSApply(result, "/savegame/universe//component[@class='npc' and @owner='player']", xmlAttrs, addFinalizer = TRUE),
+    function(x) x[!(names(x) %in% c("lastspeaktime"))]
+  ))
+)
+
+df.npcs <- df.temp[,c("id","name",intersect(colnames(df.temp),c("code")))]
+
 if (is.data.frame(df.npcs)) {
   df.temp <- df.npcs[, c("id"), drop = FALSE]
   df.temp$numSkills <- xpathSApply(result, "/savegame/universe//component[@class='npc' and @owner='player']/traits", xmlSize, addFinalizer = TRUE)
@@ -769,15 +785,22 @@ if (NROW(df.temp) > 0) {
 
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding pirate harassments -> df.pirates"))
 df.pirates <- df.log[str_detect(df.log$title, fixed("Pirate Harassment")), c("time","text")]
-df.pirates <- cbind(df.pirates[,"time",drop=FALSE], setNames(as.data.frame(str_split(df.pirates$text, " in |[.]?.{1}\\\\012.{1}", simplify = TRUE))[,c(1,2,4,5)], c("ship","sector.name","pirate","response")))
-df.pirates <- left_join(df.pirates, df.sectors[,c("name","sector.macro")], by = c("sector.name" = "name"))
-df.pirates$ship.code <- str_extract(df.pirates$ship, "[A-Z]{3}-[0-9]{3}$")
-df.pirates$ship.name <- sub(" [A-Z]{3}-[0-9]{3}$", "", df.pirates$ship)
-df.pirates$pirate.code <- str_extract(df.pirates$pirate, "[A-Z]{3}-[0-9]{3}$")
-df.pirates$pirate.faction <- factor(str_extract(df.pirates$pirate, "^[A-Z]{3}"), levels = factions.levels, ordered = TRUE)
-df.pirates$pirate.name <- sub("^[A-Z]{3} ", "", sub(" [A-Z]{3}-[0-9]{3}$", "", df.pirates$pirate))
-df.pirates$response <- factor(sub("^Response: ", "", df.pirates$response))
-df.pirates <- df.pirates[,c("time","ship.name","ship.code","sector.macro","sector.name","pirate.name","pirate.code","pirate.faction","response")]
+if (NROW(df.pirates) > 0) {
+  df.pirates <- cbind(df.pirates[,"time",drop=FALSE], setNames(as.data.frame(str_split(df.pirates$text, " in |[.]?.{1}\\\\012.{1}", simplify = TRUE))[,c(1,2,4,5)], c("ship","sector.name","pirate","response")))
+  df.pirates <- left_join(df.pirates, df.sectors[,c("name","sector.macro")], by = c("sector.name" = "name"))
+  df.pirates$ship.code <- str_extract(df.pirates$ship, "[A-Z]{3}-[0-9]{3}$")
+  df.pirates$ship.name <- sub(" [A-Z]{3}-[0-9]{3}$", "", df.pirates$ship)
+  df.pirates$pirate.code <- str_extract(df.pirates$pirate, "[A-Z]{3}-[0-9]{3}$")
+  df.pirates$pirate.faction <- factor(str_extract(df.pirates$pirate, "^[A-Z]{3}"), levels = factions.levels, ordered = TRUE)
+  df.pirates$pirate.name <- sub("^[A-Z]{3} ", "", sub(" [A-Z]{3}-[0-9]{3}$", "", df.pirates$pirate))
+  df.pirates$response <- factor(sub("^Response: ", "", df.pirates$response))
+  df.pirates <- df.pirates[,c("time","ship.name","ship.code","sector.macro","sector.name","pirate.name","pirate.code","pirate.faction","response")]
+} else {
+  pirates_cols = c("time","ship.name","ship.code","sector.macro","sector.name","pirate.name","pirate.code","pirate.faction","response")
+  df.pirates <- data.frame(matrix(nrow = 0, ncol = length(pirates_cols)))
+  colnames(df.pirates) = pirates_cols
+}
+
 
 message(paste(format(Sys.time(), "%H:%M:%OS3"), "Finding police interdictions -> df.police"))
 df.police <- df.log[str_detect(df.log$title, fixed("Police Interdiction")), c("time","text")]
@@ -863,17 +886,27 @@ df.plot.text$x[which(df.plot.text$altname == "Avarice")] <- df.plot.text$x[which
 df.plot.text$x[which(df.plot.text$altname == "Grand Exchange")] <- df.plot.text$x[which(df.plot.text$altname == "Grand Exchange")] + x.div/8
 df.plot.text <- df.plot.text[!is.na(df.plot.text$altname),]
 
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "df.plot.police"))
 df.temp <- df.police[df.police$time > time.overlay, c("sector.name","sector.macro")]
 df.temp <- aggregate(df.temp$sector.macro, by = list(name = df.temp$sector.name), FUN = "length")
 colnames(df.temp)[2] <- "interdictions"
 df.plot.police <- inner_join(df.plot.sectors, df.temp, by = "name")[,c("x","y","knownto","sizecat","interdictions","name")]
 df.plot.police$scale <- df.plot.police$interdictions / max(df.plot.police$interdictions, na.rm = TRUE)
 
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "df.plot.pirates"))
 df.temp <- df.pirates[df.pirates$time > time.overlay, c("sector.name","sector.macro")]
-df.temp <- aggregate(df.temp$sector.macro, by = list(name = df.temp$sector.name), FUN = "length")
+if (NROW(df.temp) > 0) {
+  df.temp <- aggregate(df.temp$sector.macro, by = list(name = df.temp$sector.name), FUN = "length")
+}
 colnames(df.temp)[2] <- "harassments"
-df.plot.pirates <- inner_join(df.plot.sectors, df.temp, by = "name")[,c("x","y","knownto","sizecat","harassments","name")]
-df.plot.pirates$scale <- df.plot.pirates$harassments / max(df.plot.pirates$harassments, na.rm = TRUE)
+
+if (NROW(df.temp) > 0) {
+  df.plot.pirates <- inner_join(df.plot.sectors, df.temp, by = "name")[,c("x","y","knownto","sizecat","harassments","name")]
+  df.plot.pirates$scale <- df.plot.pirates$harassments / max(df.plot.pirates$harassments, na.rm = TRUE)
+} else {
+  df.plot.pirates <- data.frame(x=numeric(0),y=numeric(0),knownto=character(0),sizecat=character(0), harassments=integer(0), name=character(0), scale=numeric(0))
+}
+
 
 df.temp <- left_join(left_join(left_join(df.plot.sectors[,"name", drop = FALSE],
                                          df.plot.police[,c("name","interdictions")],
@@ -907,6 +940,7 @@ for (lvl in rev(seq_along(lvls))) {
   df.plot.sectors$tooltip[-idx] <- substr(df.plot.sectors$tooltip[-idx], 1, nchar(df.plot.sectors$tooltip[-idx]) - 2)
 }
 
+message(paste(format(Sys.time(), "%H:%M:%OS3"), "makeMap"))
 
 # sizex/sizey = image size (keep it at 16x9 AR), marker.big/small = marker sizes in px, marker.border = owner colour border in px,
 # marker.contested.big/small = size of the contested crosses
@@ -1188,7 +1222,7 @@ if (!identical(find("df.sales"), character(0))) {
   }
 }
 
-if (!identical(find("df.transfers"), character(0))) {
+if (!identical(find("df.transfers"), character(0)) && !is.null(df.transfers)) {
   plot.title <- "Account Transfers per Station (cumulative)"
   message(paste(format(Sys.time(), "%H:%M:%OS3"), "->", plot.title))
   df.plot <- data.frame(time = trunc((df.transfers$time - time.now) / (sample_smoothing*3600)) * sample_smoothing, station = as.character(df.transfers$station.name), money = df.transfers$money, stringsAsFactors = FALSE)
